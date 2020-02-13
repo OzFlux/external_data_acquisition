@@ -184,29 +184,11 @@ def wget_exec(read_path, write_path, server_dir):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-### LOGGING CONFIGURATION ###
-#------------------------------------------------------------------------------
-
-#t = time.localtime()
-#rundatetime = (datetime(t[0],t[1],t[2],t[3],t[4],t[5]).strftime("%Y%m%d%H%M"))
-#log_path = os.path.join(base_dir, 'Log_files')
-#log_filename = os.path.join(log_path, 'access_data_{}.log'.format(rundatetime))
-#logging.basicConfig(filename=log_filename,
-#                    format='%(levelname)s %(message)s',
-##                    datefmt = '%H:%M:%S',
-#                    level=logging.DEBUG)
-#console = logging.StreamHandler()
-#formatter = logging.Formatter('%(levelname)s %(message)s')
-#console.setFormatter(formatter)
-#console.setLevel(logging.INFO)
-#logging.getLogger('').addHandler(console)
-
-#------------------------------------------------------------------------------
 ### MAIN PROGRAM ###
 #------------------------------------------------------------------------------
 
 # Configure the logger
-dt_str = dt.datetime.now(dt.datetime.strftime("%Y%m%d%H%M"))
+dt_str = dt.datetime.now().strftime("%Y%m%d%H%M")
 full_log_path = os.path.join(base_log_path, 'ACCESS', 
                              'access_data_{}.log'.format(dt_str))
 utils.set_logger(full_log_path)
