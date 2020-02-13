@@ -6,16 +6,17 @@ Created on Wed Sep 11 11:41:50 2019
 @author: ian
 """
 import configparser
-from datetime import datetime
 import logging
 import os
 import pandas as pd
-import time
 import xlrd
 
 #------------------------------------------------------------------------------
 def get_configs():
 
+    """Create a configuration file that defines requisite read and write paths
+       (reads from same dir as executing script - i.e. this one!)"""
+    
     path = os.path.join(os.path.dirname(__file__), 'paths.ini')
     config = configparser.ConfigParser()
     config.read(path)
@@ -25,6 +26,10 @@ def get_configs():
 #------------------------------------------------------------------------------
 def get_ozflux_site_list(master_file_path = None):
 
+    """Generates a dataframe containing requisite site details (auto-reads 
+       file location from [DEFAULT][site_details] in paths.ini - see 
+       get_configs)"""
+    
     if not master_file_path:
         configs = get_configs()
         master_file_path = configs['DEFAULT']['site_details']
@@ -47,11 +52,9 @@ def get_ozflux_site_list(master_file_path = None):
 #------------------------------------------------------------------------------
 def set_logger(target_filepath):
 
-    t = time.localtime()
-    rundatetime = (datetime(t[0],t[1],t[2],t[3],t[4],t[5]).strftime("%Y%m%d%H%M"))
-    log_filename = os.path.join(target_filepath, 
-                                'access_data_{}.log'.format(rundatetime))
-    logging.basicConfig(filename=log_filename,
+    """Does basic standardised configuration for logger"""
+    
+    logging.basicConfig(filename=target_filepath,
                         format='%(levelname)s %(message)s',
                         level=logging.DEBUG)
     console = logging.StreamHandler()
