@@ -6,8 +6,11 @@ Created on Wed Sep 11 11:41:50 2019
 @author: ian
 """
 import configparser
+from datetime import datetime
+import logging
 import os
 import pandas as pd
+import time
 import xlrd
 
 #------------------------------------------------------------------------------
@@ -39,4 +42,21 @@ def get_ozflux_site_list(master_file_path = None):
     df.index = df[header_list[0]]
     df.drop(header_list[0], axis = 1, inplace = True)
     return df
+#------------------------------------------------------------------------------
+    
+#------------------------------------------------------------------------------
+def set_logger(target_filepath):
+
+    t = time.localtime()
+    rundatetime = (datetime(t[0],t[1],t[2],t[3],t[4],t[5]).strftime("%Y%m%d%H%M"))
+    log_filename = os.path.join(target_filepath, 
+                                'access_data_{}.log'.format(rundatetime))
+    logging.basicConfig(filename=log_filename,
+                        format='%(levelname)s %(message)s',
+                        level=logging.DEBUG)
+    console = logging.StreamHandler()
+    formatter = logging.Formatter('%(levelname)s %(message)s')
+    console.setFormatter(formatter)
+    console.setLevel(logging.INFO)
+    logging.getLogger('').addHandler(console)
 #------------------------------------------------------------------------------
