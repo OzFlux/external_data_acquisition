@@ -11,7 +11,7 @@ Created on Tue Jan 29 10:19:53 2019
 #------------------------------------------------------------------------------
 
 from bs4 import BeautifulSoup
-from datetime import datetime
+import datetime as dt
 import logging
 import netCDF4
 import numpy as np
@@ -20,8 +20,6 @@ import pandas as pd
 import requests
 from subprocess import call as spc
 import sys
-import time
-import xlrd
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -38,9 +36,10 @@ import utils
 configs = utils.get_configs()
 base_dir = configs['nc_data_write_paths']['access']
 master_file_path = configs['DEFAULT']['site_details']
+base_log_path = configs['DEFAULT']['log_path']
 
 #------------------------------------------------------------------------------
-### CONFIGURATIONS (LOCAL) ###
+### CONFIGURATIONS (REMOTE) ###
 #------------------------------------------------------------------------------
 
 retrieval_path = 'http://opendap.bom.gov.au:8080/thredds/{}/bmrc/access-r-fc/ops/surface/'
@@ -69,7 +68,7 @@ def check_seen_files(opendap_url, base_dir, site_list):
                 nc = netCDF4.Dataset(target)
                 dts = sorted(netCDF4.num2date(nc.variables['time'][:],
                              units = nc.variables['time'].units))
-                seen_dates = [datetime.strftime(x, '%Y%m%d') for x in dts]
+                seen_dates = [dt.datetime.strftime(x, '%Y%m%d') for x in dts]
                 seen_hours = [str(x.hour - x.hour % 6).zfill(2) for x in dts]
                 seen_dirs += list(set([x[0] + x[1] for x in zip(seen_dates,
                                                                 seen_hours)]))
@@ -123,7 +122,7 @@ def _list_opendap_dirs(url):
         path_list = path.replace('//', '/').split('/')[1:]
         try:
             path_list.remove('catalog.html')
-            datetime.strptime(path_list[-1], '%Y%m%d%H')
+            dt.datetime.strptime(path_list[-1], '%Y%m%d%H')
             new_list.append(path_list[-1])
         except:
             continue
@@ -163,7 +162,7 @@ def purge_dir(directory, file_ext = '.tmp'):
 #------------------------------------------------------------------------------
 def wget_exec(read_path, write_path, server_dir):
 
-    """Build the complete wget string and retrieve temp file"""
+    """Build the complete wget string and retrieve temp continental file"""
 
     logging.info('Retrieving forecast files for date {}'.format(server_dir))
     file_list = map(lambda x: '{}_{}'.format(server_dir, str(x).zfill(3)),
@@ -185,60 +184,54 @@ def wget_exec(read_path, write_path, server_dir):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-# USER PATH CONFIGURATIONS
+### LOGGING CONFIGURATION ###
 #------------------------------------------------------------------------------
 
-
-
-#------------------------------------------------------------------------------
-# LOGGING CONFIGURATION
-#------------------------------------------------------------------------------
-
-t = time.localtime()
-rundatetime = (datetime(t[0],t[1],t[2],t[3],t[4],t[5]).strftime("%Y%m%d%H%M"))
-log_path = os.path.join(base_dir, 'Log_files')
-log_filename = os.path.join(log_path, 'access_data_{}.log'.format(rundatetime))
-logging.basicConfig(filename=log_filename,
-                    format='%(levelname)s %(message)s',
-#                    datefmt = '%H:%M:%S',
-                    level=logging.DEBUG)
-console = logging.StreamHandler()
-formatter = logging.Formatter('%(levelname)s %(message)s')
-console.setFormatter(formatter)
-console.setLevel(logging.INFO)
-logging.getLogger('').addHandler(console)
+#t = time.localtime()
+#rundatetime = (datetime(t[0],t[1],t[2],t[3],t[4],t[5]).strftime("%Y%m%d%H%M"))
+#log_path = os.path.join(base_dir, 'Log_files')
+#log_filename = os.path.join(log_path, 'access_data_{}.log'.format(rundatetime))
+#logging.basicConfig(filename=log_filename,
+#                    format='%(levelname)s %(message)s',
+##                    datefmt = '%H:%M:%S',
+#                    level=logging.DEBUG)
+#console = logging.StreamHandler()
+#formatter = logging.Formatter('%(levelname)s %(message)s')
+#console.setFormatter(formatter)
+#console.setLevel(logging.INFO)
+#logging.getLogger('').addHandler(console)
 
 #------------------------------------------------------------------------------
-# MAIN PROGRAM
+### MAIN PROGRAM ###
 #------------------------------------------------------------------------------
 
-# Check the base directory contains the required subdirs, create if not
-check_set_subdirs(base_dir)
+# Configure the logger
+dt_str = dt.datetime.now(dt.datetime.strftime("%Y%m%d%H%M"))
+full_log_path = os.path.join(base_log_path, 'ACCESS', 
+                             'access_data_{}.log'.format(dt_str))
+utils.set_logger(full_log_path)
 
 # Get site details
 site_df = utils.get_ozflux_site_list(master_file_path)
 
-# Set the path for continental file retrieval
+# Set and pre-purge requisite file paths
+check_set_subdirs(base_dir)
 continental_file_path = os.path.join(base_dir, 'Continental_files')
+purge_dir(continental_file_path)
 
 # Cross check available files on the opendap server against content of existing
 # files
 files_dict = check_seen_files(retrieval_path, base_dir, site_df.index)
 
-# Pre-purge the continental file path for all temp files
-purge_dir(continental_file_path)
-
 # For each six-hour directory...
 for this_dir in sorted(files_dict.keys()):
-
-    # Get a list of the sites we need to collect data for
-    sites_list = sorted(files_dict[this_dir])
 
     # Grab the continent-wide files (n = 6)
     wget_exec(retrieval_path, continental_file_path, this_dir)
 
     # Cut out site from continent-wide file and append
     # (see shell script nco_shell.sh)
+    sites_list = sorted(files_dict[this_dir])
     for site in sites_list:
         logging.info('Running site {}'.format(site))
         site_details = site_df.loc[site]
