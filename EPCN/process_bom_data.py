@@ -4,6 +4,16 @@
 Created on Fri Feb  7 13:11:54 2020
 
 @author: imchugh
+
+This script takes the nearest 5 BOM stations which cover the data period for 
+the tower and rewrites all variables to PFP format, appending the variable names
+with a number that increases with distance from the site (0 closest).
+
+To do:
+    - do timezone checking and conversion for any sites that use bom sites in
+      another time zone
+    - add a key to the metadata describing the bom sites, and remove from 
+      individual variables
 """
 
 #------------------------------------------------------------------------------

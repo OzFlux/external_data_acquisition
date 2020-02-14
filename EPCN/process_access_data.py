@@ -16,9 +16,7 @@ import numpy as np
 import os
 import pandas as pd
 from pytz import timezone
-from timezonefinder import TimezoneFinder as tzf
 import xarray as xr
-import xlrd
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -47,6 +45,7 @@ class access_data_converter():
         self.latitude = round(site_details.Latitude, 4)
         self.longitude = round(site_details.Longitude, 4)
         self.time_step = site_details['Time step']
+        self.time_zone = site_details['Time zone']
         self.return_soil_depths = return_soil_depths
     #--------------------------------------------------------------------------
 
@@ -70,7 +69,6 @@ class access_data_converter():
                                          round(this_lat.item(), 4),
                                          round(this_lon.item(), 4))
                 results.append(_rename_variables(conv_ds, i, j))
-                #results.append(conv_ds)
         in_ds.close()
         merge_ds = xr.merge(results, compat='override')
         offset = self.get_utc_offset()
@@ -104,8 +102,7 @@ class access_data_converter():
     #--------------------------------------------------------------------------
     def get_utc_offset(self):
         
-        tz_name = tzf().timezone_at(lng = self.longitude, lat = self.latitude)
-        tz_obj = timezone(tz_name)
+        tz_obj = timezone(self.time_zone)
         now_time = dt.datetime.now()
         return (tz_obj.utcoffset(now_time) - tz_obj.dst(now_time)).seconds / 3600
     #--------------------------------------------------------------------------
@@ -211,7 +208,6 @@ def _screen_vars(series):
 #--------------------------------------------------------------------------
 def _set_variable_attributes(ds, latitude, longitude):
 
-    #print([x for x in attrs_dict.keys() if not x in list(ds.variables)])
     for this_var in list(ds.variables):
         if this_var == 'time': continue
         try:
@@ -431,6 +427,5 @@ if __name__ == "__main__":
         site_name = site.replace(' ','')
         site_details = sites_df.loc[site]
         converter = access_data_converter(site_details)
-        out_path = os.path.join(access_file_path)
-        converter.write_to_netcdf(out_path)
+        converter.write_to_netcdf(access_file_path)
 #------------------------------------------------------------------------------

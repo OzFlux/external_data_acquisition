@@ -389,7 +389,7 @@ def get_nearest_bom_station(lat, lon, start_date = None, end_date = None,
     except TypeError: None
     try: py_end_date = dt.datetime.strptime(end_date, '%Y%m%d').date()
     except TypeError: py_end_date = dt.datetime.now().date()
-    stations = get_aws_station_details()
+    stations = get_aws_station_details(with_timezone=True)
     if start_date:
         py_start = []
         for st in stations.index:

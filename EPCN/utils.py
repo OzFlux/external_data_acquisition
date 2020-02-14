@@ -9,6 +9,7 @@ import configparser
 import logging
 import os
 import pandas as pd
+from timezonefinder import TimezoneFinder as tzf
 import xlrd
 
 #------------------------------------------------------------------------------
@@ -46,6 +47,8 @@ def get_ozflux_site_list(master_file_path = None):
     df['End year'] = pd.to_numeric(df['End year'], errors='coerce')
     df.index = df[header_list[0]]
     df.drop(header_list[0], axis = 1, inplace = True)
+    df['Time zone'] = [tzf().timezone_at(lng=x[0], lat=x[1]) 
+                       for x in zip(df.Longitude, df.Latitude)]
     return df
 #------------------------------------------------------------------------------
     
