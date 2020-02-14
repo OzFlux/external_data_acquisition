@@ -294,7 +294,8 @@ def _get_var_attrs(var, nearest_stations):
     var_specific_dict = vars_dict[var]
     bomsite_specific_dict = {'bom_name': nearest_stations.iloc[idx].station_name,
                              'bom_id': nearest_stations.index[idx],
-                             'bom_dist (km)': str(nearest_stations.iloc[idx]['dist (km)'])}
+                             'bom_dist (km)': str(nearest_stations.iloc[idx]['dist (km)']),
+                             'time_zone': nearest_stations.iloc[idx]['time_zone']}
     return {**var_specific_dict, **bomsite_specific_dict, **generic_dict}
 #--------------------------------------------------------------------------
    

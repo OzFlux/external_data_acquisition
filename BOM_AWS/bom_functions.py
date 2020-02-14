@@ -411,7 +411,8 @@ def get_nearest_bom_station(lat, lon, start_date = None, end_date = None,
                                                          stations.loc[x, 'lon']),
                                      stations.index))
     df = stations.sort_values(['dist (km)']).head(nearest_n)
-    return df[['station_name', 'lat', 'lon', 'month_year_opened', 'dist (km)']]
+    return df[['station_name', 'lat', 'lon', 'month_year_opened', 
+               'month_year_closed', 'dist (km)', 'timezone']]
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
