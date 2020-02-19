@@ -288,7 +288,7 @@ def get_aws_station_details(with_timezone = False):
     df.index = df['station_id']
     df['station_name'] = [x.rstrip() for x in df.station_name]
     if with_timezone:
-        df['timezone'] = [get_timezone(df.loc[idx, 'lat'], df.loc[idx, 'lon'])
+        df['time_zone'] = [get_timezone(df.loc[idx, 'lat'], df.loc[idx, 'lon'])
                           for idx in df.index]
     return df.sort_index()
 #------------------------------------------------------------------------------
@@ -412,7 +412,7 @@ def get_nearest_bom_station(lat, lon, start_date = None, end_date = None,
                                      stations.index))
     df = stations.sort_values(['dist (km)']).head(nearest_n)
     return df[['station_name', 'lat', 'lon', 'month_year_opened', 
-               'month_year_closed', 'dist (km)', 'timezone']]
+               'month_year_closed', 'dist (km)', 'time_zone']]
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------

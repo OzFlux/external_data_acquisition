@@ -21,6 +21,8 @@ import requests
 from subprocess import call as spc
 import sys
 
+import pdb
+
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
 #------------------------------------------------------------------------------
@@ -217,5 +219,5 @@ for this_dir in sorted(files_dict.keys()):
     for site in sites_list:
         logging.info('Running site {}'.format(site))
         site_details = site_df.loc[site]
-        nco_exec(base_dir, site_details.name, this_dir,
+        nco_exec(base_dir, site_details.name.replace(' ',''), this_dir,
                  site_details.Latitude, site_details.Longitude)

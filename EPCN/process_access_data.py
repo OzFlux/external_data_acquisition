@@ -17,6 +17,7 @@ import os
 import pandas as pd
 from pytz import timezone
 import xarray as xr
+import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -29,7 +30,6 @@ import utils
 #------------------------------------------------------------------------------
 
 configs = utils.get_configs()
-master_file_path = configs['DEFAULT']['site_details']
 access_file_path = configs['nc_data_write_paths']['access']
 
 #------------------------------------------------------------------------------
@@ -64,6 +64,7 @@ class access_data_converter():
                 df.index = in_ds.time.data
                 df.index.name = 'time'
                 df = df.loc[~df.index.duplicated()]
+                pdb.set_trace()
                 conv_ds = do_conversions(df).to_xarray()
                 _set_variable_attributes(conv_ds,
                                          round(this_lat.item(), 4),
@@ -83,7 +84,7 @@ class access_data_converter():
     #--------------------------------------------------------------------------
     def get_file_list(self):
 
-        search_str = self.site_name.replace(' ', '_')
+        search_str = self.site_name.replace(' ', '')
         return sorted(glob.glob(access_file_path +
                                 '/Monthly_files/**/{}*'.format(search_str)))
     #--------------------------------------------------------------------------
@@ -422,7 +423,7 @@ vars_dict = {'av_swsfcdown': 'Fsd',
 #------------------------------------------------------------------------------
 if __name__ == "__main__":
 
-    sites_df = utils.get_ozflux_site_list(master_file_path)
+    sites_df = utils.get_ozflux_site_list()
     for site in sites_df.index:
         site_name = site.replace(' ','')
         site_details = sites_df.loc[site]
