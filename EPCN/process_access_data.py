@@ -64,7 +64,6 @@ class access_data_converter():
                 df.index = in_ds.time.data
                 df.index.name = 'time'
                 df = df.loc[~df.index.duplicated()]
-                pdb.set_trace()
                 conv_ds = do_conversions(df).to_xarray()
                 _set_variable_attributes(conv_ds,
                                          round(this_lat.item(), 4),
