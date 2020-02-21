@@ -32,7 +32,6 @@ import met_funcs
 
 configs = utils.get_configs()
 access_file_path = configs['nc_data_write_paths']['access']
-path='/home/unimelb.edu.au/imchugh/Desktop/Adelaide_River.nc'
 
 #------------------------------------------------------------------------------
 ### CLASSES ###
@@ -56,9 +55,11 @@ class access_data_converter():
 
         # Do formatting, conversions and attributes
         ds = self.get_raw_file()
+        ds = ds.compute() # This converts from dask to numpy :)
         ds = ds[list(vars_dict.keys())]
         _apply_range_limits(ds)
         ds = ds.rename(vars_dict)
+        ds = _reindex_time(ds)
         if self.time_step == 30: ds = _resample_dataset(ds)
         do_conversions(ds)
         get_energy_components(ds)
@@ -107,12 +108,6 @@ class access_data_converter():
                                 '/Monthly_files/**/{}*'.format(search_str)))
     #--------------------------------------------------------------------------
 
-    # #--------------------------------------------------------------------------
-    # def get_raw_file(self):
-
-    #     return xr.open_dataset(path)
-    # #--------------------------------------------------------------------------
-
     #--------------------------------------------------------------------------
     def get_raw_file(self):
 
@@ -131,7 +126,7 @@ class access_data_converter():
         now_time = dt.datetime.now()
         return (tz_obj.utcoffset(now_time) - tz_obj.dst(now_time)).seconds / 3600
     #--------------------------------------------------------------------------
-
+    
     #--------------------------------------------------------------------------
     def _set_global_attrs(self, ds):
 
@@ -174,6 +169,8 @@ def _apply_range_limits(ds):
         if var in ds.dims: continue
         lims = range_dict[var]
         ds[var] = ds[var].where(cond=(ds[var] >= lims[0]) & (ds[var] <= lims[1]))
+    ds['inst_prcp'] = ds.inst_prcp.where(cond=((ds.inst_prcp < -1) | 
+                                               (ds.inst_prcp > 0.001)), other=0)
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -200,15 +197,28 @@ def get_energy_components(ds):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
+def _reindex_time(ds):
+    
+    new_index = pd.date_range(ds.time[0].item(), ds.time[-1].item(), freq='60T')
+    return ds.reindex(time=new_index)
+#------------------------------------------------------------------------------
+    
+#------------------------------------------------------------------------------
 def _resample_dataset(ds):
 
-    precip_list = [x for x in ds if 'Precip' in x]
-    no_precip_list = [x for x in ds if not 'Precip' in x]
-    new_ds = ds[no_precip_list].resample(time='30T').interpolate('linear')
-    for var in precip_list:
-        cuml_precip = ds[var].cumsum()
-        cuml_precip = cuml_precip.resample(time='30T').interpolate('linear')
-        new_ds[var] = cuml_precip - cuml_precip.shift(time=1)
+    """Resample to half-hourly and interpolate only gaps created by 
+       resampling; note that rainfall must be converted to a cumulative sum
+       to be resampled, then redifferenced to recover hourly total rainfall"""
+    
+    new_ds = ds.copy()
+    new_ds['cml_precip'] = new_ds.Precip.cumsum(dim='time')
+    new_dates = pd.date_range(start=ds.time[0].item(), end=ds.time[-1].item(),
+                              freq='30T')
+    new_ds = (new_ds.reindex(time=new_dates)
+                  .interpolate_na(dim='time', max_gap=pd.Timedelta(hours=1)))
+    new_ds['cml_precip'] = new_ds.cml_precip.where(~np.isnan(new_ds.Precip))
+    new_ds['Precip'] = new_ds.cml_precip - new_ds.cml_precip.shift(time=1)
+    new_ds = new_ds.drop('cml_precip')
     return new_ds
 #------------------------------------------------------------------------------
 
@@ -299,7 +309,7 @@ range_dict = {'av_swsfcdown': [0, 1400],
               'u10': [-50, 50],
               'v10': [-50, 50],
               'sfc_pres': [75000, 110000],
-              'inst_prcp': [0, 100],
+              'inst_prcp': [-1, 100],
               'sens_hflx': [-200, 1000],
               'lat_hflx': [-200, 1000],
               'abl_ht': [0, 5000]}
@@ -330,10 +340,9 @@ vars_dict = {'av_swsfcdown': 'Fsd',
 #------------------------------------------------------------------------------
 if __name__ == "__main__":
 
-    # sites_df = utils.get_ozflux_site_list(master_file_path='/home/unimelb.edu.au/imchugh/Temp/site_master.xls')
     sites_df = utils.get_ozflux_site_list()
-    for site in sites_df.index:
+    for site in sites_df.index[:1]:
         site_details = sites_df.loc[site]
         converter = access_data_converter(site_details)
-        converter.write_to_netcdf(access_file_path)
+#        converter.write_to_netcdf(access_file_path)
 #------------------------------------------------------------------------------
