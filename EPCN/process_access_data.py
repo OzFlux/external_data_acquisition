@@ -66,6 +66,7 @@ class access_data_converter():
         ds = ds.fillna(-9999.0)
         offset = self.get_utc_offset()
         ds.time.data = (pd.to_datetime(ds.time.data) + dt.timedelta(hours=offset))
+        ds = xr.merge(ds, make_qc_flags(ds))
         _set_var_attrs(ds)
         self._set_global_attrs(ds)
 
@@ -126,7 +127,7 @@ class access_data_converter():
         now_time = dt.datetime.now()
         return (tz_obj.utcoffset(now_time) - tz_obj.dst(now_time)).seconds / 3600
     #--------------------------------------------------------------------------
-    
+
     #--------------------------------------------------------------------------
     def _set_global_attrs(self, ds):
 
@@ -169,7 +170,7 @@ def _apply_range_limits(ds):
         if var in ds.dims: continue
         lims = range_dict[var]
         ds[var] = ds[var].where(cond=(ds[var] >= lims[0]) & (ds[var] <= lims[1]))
-    ds['inst_prcp'] = ds.inst_prcp.where(cond=((ds.inst_prcp < -1) | 
+    ds['inst_prcp'] = ds.inst_prcp.where(cond=((ds.inst_prcp < -1) |
                                                (ds.inst_prcp > 0.001)), other=0)
 #------------------------------------------------------------------------------
 
@@ -197,19 +198,33 @@ def get_energy_components(ds):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
+def make_qc_flags(ds):
+
+    """Generate QC flags for all variables in the ds"""
+
+    da_list = []
+    for var in ds.variables:
+        if var in ds.dims: continue
+        da = xr.where(~np.isnan(ds[var]), 0, 10)
+        da.name = var + '_QCFlag'
+        da_list.append(da)
+    return xr.merge(da_list)
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
 def _reindex_time(ds):
-    
+
     new_index = pd.date_range(ds.time[0].item(), ds.time[-1].item(), freq='60T')
     return ds.reindex(time=new_index)
 #------------------------------------------------------------------------------
-    
+
 #------------------------------------------------------------------------------
 def _resample_dataset(ds):
 
-    """Resample to half-hourly and interpolate only gaps created by 
+    """Resample to half-hourly and interpolate only gaps created by
        resampling; note that rainfall must be converted to a cumulative sum
        to be resampled, then redifferenced to recover hourly total rainfall"""
-    
+
     new_ds = ds.copy()
     new_ds['cml_precip'] = new_ds.Precip.cumsum(dim='time')
     new_dates = pd.date_range(start=ds.time[0].item(), end=ds.time[-1].item(),
@@ -344,5 +359,5 @@ if __name__ == "__main__":
     for site in sites_df.index[:1]:
         site_details = sites_df.loc[site]
         converter = access_data_converter(site_details)
-#        converter.write_to_netcdf(access_file_path)
+        converter.write_to_netcdf(access_file_path)
 #------------------------------------------------------------------------------
