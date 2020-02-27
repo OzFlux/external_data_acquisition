@@ -205,14 +205,14 @@ def _combine_datasets(current_ds, site_name):
 #------------------------------------------------------------------------------
 def do_conversions(ds):
 
-    ds['Ws'] = met_funcs.get_wind_speed(ds.u, ds.v)
-    ds['Wd'] = met_funcs.get_wind_direction(ds.u, ds.v)
+    ds['Ws'] = met_funcs.get_wind_speed_from_vectors(ds.u, ds.v)
+    ds['Wd'] = met_funcs.get_wind_direction_from_vectors(ds.u, ds.v)
     ds['RH'] = (met_funcs.get_e_from_spec_hum(ds.q, ds.ps) / 
                 met_funcs.get_es(ds.Ta)) * 100
     ds['Ah'] = met_funcs.get_Ah(ds.Ta, ds.q, ds.ps)
     ds['Ta'] = met_funcs.convert_Kelvin_to_celsius(ds.Ta)
     ds['Ts'] = met_funcs.convert_Kelvin_to_celsius(ds.Ts)
-    ds['ps'] = met_funcs.convert_pressure(ds.ps)
+    ds['ps'] = met_funcs.convert_Pa_to_kPa(ds.ps)
     ds['Sws'] = ds['Sws'] / 100
 #------------------------------------------------------------------------------
 

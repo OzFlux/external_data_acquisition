@@ -25,6 +25,7 @@ import numpy as np
 import os
 import pandas as pd
 import sys
+import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -33,6 +34,7 @@ import sys
 this_path = os.path.join(os.path.dirname(__file__), '../BOM_AWS')
 sys.path.append(this_path)
 import bom_functions as fbom
+import met_funcs
 import utils
 
 #------------------------------------------------------------------------------
@@ -62,26 +64,26 @@ class bom_data_converter(object):
         """Make a dataframe and convert data to appropriate units"""
 
         fname = os.path.join(aws_file_path, 'HM01X_Data_{}.txt'.format(station_id))
-        keep_cols = [12, 14, 16, 18, 20, 22, 24, 26]
-        df = pd.read_csv(fname, skiprows = [0], low_memory = False)
+        df = pd.read_csv(fname, low_memory = False)
         new_cols = (df.columns[:5].tolist() +
                     ['hour_local', 'minute_local', 'year', 'month', 'day',
                      'hour', 'minute'] + df.columns[12:].tolist())
         df.columns = new_cols
         df.index = pd.to_datetime(df[['year', 'month', 'day', 'hour', 'minute']])
         df.index.name = 'time'
-        for var in df.columns: df[var] = pd.to_numeric(df[var], errors = 'coerce')
-        local_time = (pd.to_numeric(df['hour_local'], errors='coerce') +
-                      pd.to_numeric(df['minute_local'], errors='coerce') / 60)
+        keep_cols = [12, 14, 16, 18, 20, 22, 24, 26]
+        parse_cols = ['hour_local', 'minute_local'] + df.columns[keep_cols].tolist()
+        for var in parse_cols: df[var] = pd.to_numeric(df[var], errors='coerce')
+        local_time = df['hour_local'] + df['minute_local'] / 60
         df = df.iloc[:, keep_cols]
         df.columns = ['Precip_accum', 'Ta', 'Td', 'RH', 'Ws', 'Wd', 'Wg', 'ps']
-        df['local_time'] = local_time
-        met_funcs = _met_funcs(df)
-        df['q'] = met_funcs.get_q()
-        df['Ah'] = met_funcs.get_Ah()
-        df['Precip'] = met_funcs.get_instantaneous_precip()
-        df.drop(['Precip_accum', 'local_time'], axis=1, inplace=True)
-        df.ps = df.ps / 10
+        df['Precip'] = get_instantaneous_precip(df.Precip_accum, local_time)
+        df.drop('Precip_accum', axis=1, inplace=True)
+        df.ps = df.ps / 10 # Convert hPa to kPa
+        T_K = met_funcs.convert_celsius_to_Kelvin(df.Ta) # Get Ta in K
+        df['q'] = met_funcs.get_q(df.RH, T_K, df.ps)
+        df['Ah'] = met_funcs.get_Ah(T_K, df.q, df.ps)
+        pdb.set_trace()
         return df
     #--------------------------------------------------------------------------
 
@@ -298,7 +300,15 @@ def _get_var_attrs(var, nearest_stations):
                              'time_zone': nearest_stations.iloc[idx]['time_zone']}
     return {**var_specific_dict, **bomsite_specific_dict, **generic_dict}
 #--------------------------------------------------------------------------
-   
+
+#--------------------------------------------------------------------------
+def get_instantaneous_precip(accum_precip, local_time):
+
+    inst_precip = accum_precip - accum_precip.shift()
+    time_bool = local_time / 9.5 == 1
+    inst_precip = inst_precip.where(~time_bool, accum_precip)
+    return inst_precip
+#--------------------------------------------------------------------------   
 #------------------------------------------------------------------------------
 ### MAIN PROGRAM
 #------------------------------------------------------------------------------
