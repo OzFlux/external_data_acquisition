@@ -99,8 +99,9 @@ class access_data_converter():
         final_ds = xr.merge([final_ds, make_qc_flags(final_ds)])
         
         # Add old data (or not), set global attrs and return
-        if self.include_prior_data: 
-            final_ds = _combine_datasets(final_ds, self.site_details.name)
+        if self.include_prior_data:
+            try: final_ds = _combine_datasets(final_ds, self.site_details.name)
+            except OSError: pass
         _set_global_attrs(final_ds, self.site_details)
         return final_ds
 
@@ -173,6 +174,7 @@ def _collate_prior_data(site_str):
 
     cutoff_month = '201910'
     f_list = sorted(glob.glob(access_file_path_prev + '/**/{}*'.format(site_str)))
+    if len(f_list) == 0: raise OSError
     months = [os.path.splitext(x)[0].split('_')[-1] for x in f_list]
     for i, month in enumerate(months): 
         if month > cutoff_month: break
@@ -190,9 +192,9 @@ def _combine_datasets(current_ds, site_name):
     site_name = site_name.replace(' ','')
     prior_ds = _collate_prior_data(site_name)
     prior_ds = prior_ds.drop(labels=[x for x in prior_ds.variables 
-                                     if not x in ds.variables])
-    for var in ds.variables:
-        if var in ds.dims: continue
+                                     if not x in current_ds.variables])
+    for var in current_ds.variables:
+        if var in current_ds.dims: continue
         current_ds[var].attrs = prior_ds[var].attrs
     current_ds = xr.concat([prior_ds, current_ds], dim='time')
     idx = np.unique(current_ds.time.data, return_index=True)[1]
