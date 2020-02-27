@@ -41,14 +41,15 @@ access_file_path_prev = configs['nc_data_write_paths']['access_previous']
 #------------------------------------------------------------------------------
 class access_data_converter():
 
-    def __init__(self, site_details):
+    def __init__(self, site_details, include_prior_data=False):
 
         self.site_details = site_details
+        self.include_prior_data = include_prior_data
 
     #--------------------------------------------------------------------------
 
     #--------------------------------------------------------------------------
-    def create_dataset(self, include_prior_data=False):
+    def create_dataset(self):
 
         # Do formatting, conversions and attributes
         ds = self.get_raw_file()
@@ -98,7 +99,7 @@ class access_data_converter():
         final_ds = xr.merge([final_ds, make_qc_flags(final_ds)])
         
         # Add old data (or not), set global attrs and return
-        if include_prior_data: 
+        if self.include_prior_data: 
             final_ds = _combine_datasets(final_ds, self.site_details.name)
         _set_global_attrs(final_ds, self.site_details)
         return final_ds
@@ -401,9 +402,8 @@ vars_dict = {'av_swsfcdown': 'Fsd',
 if __name__ == "__main__":
 
     sites_df = utils.get_ozflux_site_list()
-    for site in sites_df.index[:1]:
+    for site in sites_df.index:
         site_details = sites_df.loc[site]
-        converter = access_data_converter(site_details)
-#        converter.write_to_netcdf(access_file_path)
-        ds = converter.create_dataset(include_prior_data=True)
+        converter = access_data_converter(site_details, include_prior_data=True)
+        converter.write_to_netcdf(access_file_path)
 #------------------------------------------------------------------------------
