@@ -41,15 +41,14 @@ access_file_path_prev = configs['nc_data_write_paths']['access_previous']
 #------------------------------------------------------------------------------
 class access_data_converter():
 
-    def __init__(self, site_details, include_prior_data=False):
+    def __init__(self, site_details):
 
         self.site_details = site_details
-        self.include_prio_data = include_prior_data
 
     #--------------------------------------------------------------------------
 
     #--------------------------------------------------------------------------
-    def create_dataset(self):
+    def create_dataset(self, include_prior_data=False):
 
         # Do formatting, conversions and attributes
         ds = self.get_raw_file()
@@ -58,7 +57,7 @@ class access_data_converter():
         _apply_range_limits(ds)
         ds = ds.rename(vars_dict)
         ds = _reindex_time(ds)
-        if self.site_details.time_step == 30: ds = _resample_dataset(ds)
+        if self.site_details['Time step'] == 30: ds = _resample_dataset(ds)
         do_conversions(ds)
         get_energy_components(ds)
         ds = ds.fillna(-9999.0)
@@ -94,12 +93,16 @@ class access_data_converter():
                 # Append
                 ds_list.append(sub_ds)
 
-        # Merge and return
+        # Merge qc flags
         final_ds = xr.merge(ds_list)
         final_ds = xr.merge([final_ds, make_qc_flags(final_ds)])
-        _set_global_attrs(final_ds, self.site_details)
         
+        # Add old data (or not), set global attrs and return
+        if include_prior_data: 
+            final_ds = _combine_datasets(final_ds, self.site_details.name)
+        _set_global_attrs(final_ds, self.site_details)
         return final_ds
+
     #--------------------------------------------------------------------------
 
     #--------------------------------------------------------------------------
@@ -124,7 +127,7 @@ class access_data_converter():
     #--------------------------------------------------------------------------
     def get_utc_offset(self):
 
-        tz_obj = timezone(self.site_details.time_zone)
+        tz_obj = timezone(self.site_details['Time zone'])
         now_time = dt.datetime.now()
         return (tz_obj.utcoffset(now_time) - tz_obj.dst(now_time)).seconds / 3600
     #--------------------------------------------------------------------------
@@ -159,10 +162,20 @@ def _apply_range_limits(ds):
 #------------------------------------------------------------------------------
 def _collate_prior_data(site_str):
     
+    """Stack the individual data files from the old ACCESS collection together;
+       note that we suspect the rainfall calculation for the mod6 = 0 hours is
+       wrong in this data, so we cut to the new collection in November of '19,
+       the first month for which we collected complete data"""
+    
     def preproc(sub_ds):
         return sub_ds.drop_sel(time=sub_ds.time[-1].data)
 
+    cutoff_month = '201910'
     f_list = sorted(glob.glob(access_file_path_prev + '/**/{}*'.format(site_str)))
+    months = [os.path.splitext(x)[0].split('_')[-1] for x in f_list]
+    for i, month in enumerate(months): 
+        if month > cutoff_month: break
+    f_list = f_list[:i]
     prior_ds = xr.open_mfdataset(f_list, combine='by_coords', preprocess=preproc).compute()
     for var in list(prior_ds.variables):
         if not 'Precip' in var: continue
@@ -171,21 +184,19 @@ def _collate_prior_data(site_str):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def combine_datasets(converter_class):
+def _combine_datasets(current_ds, site_name):
     
-    new_ds = converter_class.create_dataset()
-    site_name = converter_class.site_details.name.replace(' ','')
+    site_name = site_name.replace(' ','')
     prior_ds = _collate_prior_data(site_name)
     prior_ds = prior_ds.drop(labels=[x for x in prior_ds.variables 
                                      if not x in ds.variables])
     for var in ds.variables:
         if var in ds.dims: continue
-        new_ds[var].attrs = prior_ds[var].attrs
-    combined_ds = xr.concat([prior_ds, ds], dim='time')
-    idx = np.unique(combined_ds.time.data, return_index=True)[1]
-    combined_ds = combined_ds.isel(time=idx)
-    _set_global_attrs(new_ds, converter_class.site_details)
-    converter_class
+        current_ds[var].attrs = prior_ds[var].attrs
+    current_ds = xr.concat([prior_ds, current_ds], dim='time')
+    idx = np.unique(current_ds.time.data, return_index=True)[1]
+    current_ds = current_ds.isel(time=idx)
+    return current_ds
 #------------------------------------------------------------------------------
     
 #------------------------------------------------------------------------------
@@ -281,10 +292,10 @@ def _set_global_attrs(ds, site_details):
                 'end_date': (dt.datetime.strftime
                              (pd.Timestamp(ds.time[-1].item()),
                               '%Y-%m-%d %H:%M:%S')),
-                'latitude': site_details.latitude,
-                'longitude': site_details.longitude,
+                'latitude': site_details.Latitude,
+                'longitude': site_details.Longitude,
                 'site_name': site_details.name,
-                'time_step': site_details.time_step,
+                'time_step': site_details['Time step'],
                 'xl_datemode': 0}
     ds.time.encoding = {'units': 'days since 1800-01-01',
                         '_FillValue': None}
@@ -355,7 +366,7 @@ range_dict = {'av_swsfcdown': [0, 1400],
               'qsair_scrn': [0, 1],
               'soil_mois': [0, 100],
               'soil_temp': [210, 350],
-              'u10': [-50, 50],return_soil_depths=False
+              'u10': [-50, 50],
               'v10': [-50, 50],
               'sfc_pres': [75000, 110000],
               'inst_prcp': [-1, 100],
@@ -394,14 +405,5 @@ if __name__ == "__main__":
         site_details = sites_df.loc[site]
         converter = access_data_converter(site_details)
 #        converter.write_to_netcdf(access_file_path)
-        ds = converter.create_dataset()
-#        prior_ds = _collate_prior_data('AdelaideRiver')
-#        prior_ds = prior_ds.drop(labels=[x for x in prior_ds.variables 
-#                                         if not x in ds.variables])
-#        for var in ds.variables:
-#            if var in ds.dims: continue
-#            ds[var].attrs = prior_ds[var].attrs
-#        combined_ds = xr.concat([prior_ds, ds], dim='time')
-#        idx = np.unique(combined_ds.time.data, return_index=True)[1]
-#        combined_ds = combined_ds.isel(time=idx)
+        ds = converter.create_dataset(include_prior_data=True)
 #------------------------------------------------------------------------------
