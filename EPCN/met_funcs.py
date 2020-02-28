@@ -11,6 +11,7 @@ Common meteorological functions
 import numpy as np
 import pandas as pd
 import xarray as xr
+import pdb
 
 #------------------------------------------------------------------------------
 def convert_celsius_to_Kelvin(T):
@@ -33,20 +34,21 @@ def convert_Pa_to_kPa(ps):
 #------------------------------------------------------------------------------
 def get_Ah(T, q, ps):
 
-    """Get absolute humidity (units?) from temperature (K), 
-       specific humidity (units?) and pressure (kPa)"""
-    
-    return get_e_from_q(q, ps) * 10**3 / ((T * 8.3143) / 18)
+    """Get absolute humidity (gH2O m^-3) from temperature (K), 
+       specific humidity (kgH2O kg^1) and pressure (kPa)"""
+       
+    return get_e_from_q(q, ps * 10**3) / ((T * 8.3143) / 18)
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
 def get_e_from_q(q, ps):
 
-    """Get vapour pressure (kPa) from specific humidity (units?)"""
+    """Get vapour pressure (kPa) from specific humidity (kg kg-1) and 
+       pressure (kPa)"""
     
     Md = 0.02897   # molecular weight of dry air, kg/mol
     Mv = 0.01802   # molecular weight of water vapour, kg/mol
-    return q * (Md / Mv) * (ps / 1000)
+    return q * (Md / Mv) * ps
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -64,20 +66,19 @@ def get_q(RH, T, ps):
 
     Md = 0.02897   # molecular weight of dry air, kg/mol
     Mv = 0.01802   # molecular weight of water vapour, kg/mol
-    return Mv / Md * (0.01 * RH * get_es(T) / (ps / 10))
+    return Mv / Md * (0.01 * RH * get_es(T) / ps)
 #------------------------------------------------------------------------------
-    
+
+#------------------------------------------------------------------------------
+def get_vectors_from_wind_dir_spd(wd, ws):
+
+    return -ws * np.sin(np.radians(wd)), -ws * np.cos(np.radians(wd))
+#------------------------------------------------------------------------------
+
 #------------------------------------------------------------------------------
 def get_wind_direction_from_vectors(u, v):
 
-    """Returns wind direction - note that works when u and v are either
-       xarray data_arrays or numpy arrays, but not for pandas dataframes"""
-
-    wd = float(270) - np.arctan2(v, u) * float(180) / np.pi
-    if isinstance(wd, pd.core.series.Series):
-        return pd.Series(np.where(wd < 360, wd, wd - 360), index=wd.index,
-                         name='Wd')
-    return xr.where(wd < 360, wd, wd - 360)
+    return np.mod(270 - np.degrees(np.arctan2(v, u)), 360)
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
