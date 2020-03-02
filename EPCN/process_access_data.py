@@ -207,7 +207,7 @@ def do_conversions(ds):
 
     ds['Ws'] = met_funcs.get_wind_speed(ds.u, ds.v)
     ds['Wd'] = met_funcs.get_wind_direction(ds.u, ds.v)
-    ds['RH'] = (met_funcs.get_e_from_spec_hum(ds.q, ds.ps) / 
+    ds['RH'] = (met_funcs.get_e_from_q(ds.q, ds.ps) / 
                 met_funcs.get_es(ds.Ta)) * 100
     ds['Ah'] = met_funcs.get_Ah(ds.Ta, ds.q, ds.ps)
     ds['Ta'] = met_funcs.convert_Kelvin_to_celsius(ds.Ta)
@@ -288,7 +288,7 @@ def _set_var_attrs(ds):
 #------------------------------------------------------------------------------
 def _set_global_attrs(ds, site_details):
 
-    ds.attrs = {'nrecs': len(ds.time),
+    ds.attrs = {'nc_nrecs': len(ds.time),
                 'start_date': (dt.datetime.strftime
                                (pd.Timestamp(ds.time[0].item()),
                                 '%Y-%m-%d %H:%M:%S')),
