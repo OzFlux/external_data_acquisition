@@ -17,7 +17,6 @@ import os
 import pandas as pd
 from pytz import timezone
 import xarray as xr
-import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -205,14 +204,14 @@ def _combine_datasets(current_ds, site_name):
 #------------------------------------------------------------------------------
 def do_conversions(ds):
 
-    ds['Ws'] = met_funcs.get_wind_speed(ds.u, ds.v)
-    ds['Wd'] = met_funcs.get_wind_direction(ds.u, ds.v)
+    ds['Ws'] = met_funcs.get_ws_from_uv(ds.u, ds.v)
+    ds['Wd'] = met_funcs.get_wd_from_uv(ds.u, ds.v)
+    ds['ps'] = met_funcs.convert_Pa_to_kPa(ds.ps)
     ds['RH'] = (met_funcs.get_e_from_q(ds.q, ds.ps) / 
                 met_funcs.get_es(ds.Ta)) * 100
     ds['Ah'] = met_funcs.get_Ah(ds.Ta, ds.q, ds.ps)
     ds['Ta'] = met_funcs.convert_Kelvin_to_celsius(ds.Ta)
-    ds['Ts'] = met_funcs.convert_Kelvin_to_celsius(ds.Ts)
-    ds['ps'] = met_funcs.convert_pressure(ds.ps)
+    ds['Ts'] = met_funcs.convert_Kelvin_to_celsius(ds.Ts) 
     ds['Sws'] = ds['Sws'] / 100
 #------------------------------------------------------------------------------
 
@@ -299,7 +298,7 @@ def _set_global_attrs(ds, site_details):
                 'longitude': site_details.Longitude,
                 'site_name': site_details.name,
                 'time_step': site_details['Time step'],
-                'xl_datemode': 0}
+                'xl_datemode': '0'}
     ds.time.encoding = {'units': 'days since 1800-01-01',
                         '_FillValue': None}
 #------------------------------------------------------------------------------
