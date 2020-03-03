@@ -39,8 +39,8 @@ def get_ozflux_site_list(master_file_path = None):
     header_row = 9
     header_list = sheet.row_values(header_row)
     df = pd.DataFrame()
-    for var in ['Site', 'Latitude', 'Longitude', 'Time step', 'Start year',
-                'End year']:
+    for var in ['Site', 'Latitude', 'Longitude', 'Altitude', 'Time step', 
+                'Start year', 'End year']:
         index_val = header_list.index(var)
         df[var] = sheet.col_values(index_val, header_row + 1)
     df['Start year'] = pd.to_numeric(df['Start year'], errors='coerce')

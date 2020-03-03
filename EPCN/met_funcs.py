@@ -9,9 +9,6 @@ Common meteorological functions
 """
 
 import numpy as np
-import pandas as pd
-import xarray as xr
-import pdb
 
 #------------------------------------------------------------------------------
 def convert_celsius_to_Kelvin(T):
@@ -70,19 +67,25 @@ def get_q(RH, T, ps):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def get_vectors_from_wind_dir_spd(wd, ws):
+def get_uv_from_wdws(wd, ws):
+    
+    """Return vectors u, v from wind direction and speed"""
 
     return -ws * np.sin(np.radians(wd)), -ws * np.cos(np.radians(wd))
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def get_wind_direction_from_vectors(u, v):
+def get_wd_from_uv(u, v):
 
+    """Return wind direction from vectors u, v"""
+    
     return np.mod(270 - np.degrees(np.arctan2(v, u)), 360)
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def get_wind_speed_from_vectors(u, v):
+def get_ws_from_uv(u, v):
 
+    """Return wind speed from vectors u, v"""
+    
     return np.sqrt(u**2 + v**2)
 #------------------------------------------------------------------------------
