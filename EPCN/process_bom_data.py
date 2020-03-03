@@ -21,8 +21,10 @@ To do:
 #------------------------------------------------------------------------------
 
 import datetime as dt
+import numpy as np
 import os
 import pandas as pd
+import xarray as xr
 import sys
 
 #------------------------------------------------------------------------------
@@ -81,6 +83,8 @@ class bom_data_converter(object):
         T_K = met_funcs.convert_celsius_to_Kelvin(df.Ta) # Get Ta in K
         df['q'] = met_funcs.get_q(df.RH, T_K, df.ps)
         df['Ah'] = met_funcs.get_Ah(T_K, df.q, df.ps)
+        if self.site_details['Time step'] == 60: _resample_dataframe(ds)
+        _apply_range_limits(df)
         return df
     #--------------------------------------------------------------------------
 
@@ -95,33 +99,26 @@ class bom_data_converter(object):
         except ValueError: start = None
         try: end = '{}1231'.format(str(int(self.site_details['End year'])))
         except ValueError: end = None
-        nearest_stations = fbom.get_nearest_bom_station(lat, lon, start, end, 8)
+        nearest_stations = fbom.get_nearest_bom_station(lat, lon, start, end, 3)
         
         # Now get the data
         df_list = []
         for i, station_id in enumerate(nearest_stations.index):
             try: sub_df = self._get_dataframe(station_id)
             except FileNotFoundError: continue
-            if self.site_details['Time step'] == 30:
-                sub_df = get_downsampled_dataframe(sub_df)
+#            if self.site_details['Time step'] == 30:
+#                sub_df = get_downsampled_dataframe(sub_df)
             sub_df.columns = ['{}_{}'.format(x, str(i)) for x in sub_df.columns]
             df_list.append(sub_df)
-            if len(df_list) == 4: break
         df = pd.concat(df_list, axis = 1)
         df = df.loc[str(int(self.site_details['Start year'])):]
         ds = df.to_xarray()
+        ds = ds.fillna(-9999.0)
 
-        # Generate variable attribute dictionaries and write to xarray dataset
-        for var in df.columns:
-            ds[var].attrs = _get_var_attrs(var, nearest_stations)
-
-        # Generate global attribute dictionaries and write to xarray dataset
+        # Generate variable and global attribute dictionaries and write to xarray dataset
+        _set_var_attrs(ds, nearest_stations)
         _set_global_attrs(ds, self.site_details)
 
-        # Set encoding (note should be able to assign a dict to dataset.encoding
-        # rather than iterating over vars but doesn't seem to work)
-        ds.time.encoding = {'units': 'days since 1800-01-01', '_FillValue': None}
-        for var in ds.data_vars: ds[var].encoding = {'_FillValue': -9999}
         return ds
     #--------------------------------------------------------------------------
     
@@ -148,7 +145,17 @@ class bom_data_converter(object):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def get_downsampled_dataframe(df):
+def _apply_range_limits(df):
+
+    for var in df.columns:
+        lims = range_dict[var]
+        df[var] = df[var].where(cond=(df[var] >= lims[0]) & (df[var] <= lims[1]))
+    df['Precip'] = df.Precip.where(cond=((df.Precip < -1) |
+                                         (df.Precip > 0.001)), other=0)
+#------------------------------------------------------------------------------
+    
+#------------------------------------------------------------------------------
+def _resample_dataframe(df):
 
     """Downsample to 1 hour"""
 
@@ -177,6 +184,20 @@ def get_instantaneous_precip(accum_precip, local_time):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
+def make_qc_flags(ds):
+
+    """Generate QC flags for all variables in the ds"""
+
+    da_list = []
+    for var in ds.variables:
+        if var in ds.dims: continue
+        da = xr.where(~np.isnan(ds[var]), 0, 10)
+        da.name = var + '_QCFlag'
+        da_list.append(da)
+    return xr.merge(da_list)
+#------------------------------------------------------------------------------
+    
+#------------------------------------------------------------------------------
 def _set_global_attrs(ds, site_details):
 
     """Make a dictionary of global attributes"""
@@ -202,10 +223,17 @@ def _set_global_attrs(ds, site_details):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def _set_var_attrs(var, nearest_stations):
+def _set_var_attrs(ds, nearest_stations):
 
     """Make a dictionary of attributes for passed variable"""
 
+    def get_bom_dict(idx):
+            
+        return {'bom_name': nearest_stations.iloc[idx].station_name,
+                'bom_id': nearest_stations.index[idx],
+                'bom_dist (km)': str(nearest_stations.iloc[idx]['dist (km)']),
+                'time_zone': nearest_stations.iloc[idx]['time_zone']}
+            
     vars_dict = {'Ah': {'long_name': 'Absolute humidity',
                         'units': 'g/m3'},
                  'Precip': {'long_name': 'Precipitation total over time step',
@@ -231,15 +259,32 @@ def _set_var_attrs(var, nearest_stations):
                     'missing_value': -9999, 'height': '',
                     'standard_name': '', 'group_name': '',
                     'serial_number': ''}
+    
+    for this_var in list(ds.variables):
+        if this_var in ds.dims: continue
+        l = this_var.split('_')
+        var, idx = l[0], int(l[1])
+        var_specific_dict = vars_dict[var]
+        bom_dict = get_bom_dict(idx)
+        ds[this_var].attrs = {**var_specific_dict, **bom_dict, **generic_dict}
+        ds[this_var].encoding = {'_FillValue': -9999}
+#------------------------------------------------------------------------------
 
-    l = var.split('_')
-    var, idx = l[0], int(l[1])
-    var_specific_dict = vars_dict[var]
-    bomsite_specific_dict = {'bom_name': nearest_stations.iloc[idx].station_name,
-                             'bom_id': nearest_stations.index[idx],
-                             'bom_dist (km)': str(nearest_stations.iloc[idx]['dist (km)']),
-                             'time_zone': nearest_stations.iloc[idx]['time_zone']}
-    return {**var_specific_dict, **bomsite_specific_dict, **generic_dict}
+#------------------------------------------------------------------------------
+### GLOBALS ###
+#------------------------------------------------------------------------------
+        
+#------------------------------------------------------------------------------
+range_dict = {'Precip': [-1, 100], 
+              'Ta': [-40, 60], 
+              'Td': [-60, 60],
+              'RH': [0, 100],
+              'Ws': [0, 100],
+              'Wg': [0, 100],
+              'Wd': [0, 360], 
+              'ps': [70, 110],
+              'q': [0, 1],
+              'Ah': [0, 80]}
 #------------------------------------------------------------------------------
     
 #------------------------------------------------------------------------------
