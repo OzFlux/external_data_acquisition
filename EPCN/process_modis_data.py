@@ -89,7 +89,7 @@ if __name__ == "__main__":
                 print('Retrieving data for site {}:'.format(site))
 
                 target = os.path.join(this_path,
-                                      '{0}_{1}'.format(site.replace(' ', '_'),
+                                      '{0}_{1}'.format(site.replace(' ', ''),
                                                        short_name))
                 full_nc_path = target + '.nc'
                 full_plot_path = target + '.png'
