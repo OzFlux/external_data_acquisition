@@ -258,7 +258,7 @@ def _resample_dataset(ds):
     new_dates = pd.date_range(start=ds.time[0].item(), end=ds.time[-1].item(),
                               freq='30T')
     new_ds = (new_ds.reindex(time=new_dates)
-                  .interpolate_na(dim='time', max_gap=pd.Timedelta(hours=1)))
+              .interpolate_na(dim='time', max_gap=pd.Timedelta(hours=1)))
     new_ds['cml_precip'] = new_ds.cml_precip.where(~np.isnan(new_ds.Precip))
     new_ds['Precip'] = new_ds.cml_precip - new_ds.cml_precip.shift(time=1)
     new_ds = new_ds.drop('cml_precip')

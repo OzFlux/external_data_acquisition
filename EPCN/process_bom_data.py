@@ -5,7 +5,7 @@ Created on Fri Feb  7 13:11:54 2020
 
 @author: imchugh
 
-This script takes the nearest 5 BOM stations which cover the data period for 
+This script takes the nearest 3 BOM stations which cover the data period for 
 the tower and rewrites all variables to PFP format, appending the variable names
 with a number that increases with distance from the site (0 closest).
 
@@ -26,6 +26,7 @@ import os
 import pandas as pd
 import xarray as xr
 import sys
+import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -83,7 +84,8 @@ class bom_data_converter(object):
         T_K = met_funcs.convert_celsius_to_Kelvin(df.Ta) # Get Ta in K
         df['q'] = met_funcs.get_q(df.RH, T_K, df.ps)
         df['Ah'] = met_funcs.get_Ah(T_K, df.q, df.ps)
-        if self.site_details['Time step'] == 60: _resample_dataframe(ds)
+        _interpolate_missing(df)
+        if self.site_details['Time step'] == 60: df = _resample_dataframe(df)
         _apply_range_limits(df)
         return df
     #--------------------------------------------------------------------------
@@ -99,17 +101,16 @@ class bom_data_converter(object):
         except ValueError: start = None
         try: end = '{}1231'.format(str(int(self.site_details['End year'])))
         except ValueError: end = None
-        nearest_stations = fbom.get_nearest_bom_station(lat, lon, start, end, 3)
+        nearest_stations = fbom.get_nearest_bom_station(lat, lon, start, end, 5)
         
-        # Now get the data
+        # Now get the data and combine
         df_list = []
         for i, station_id in enumerate(nearest_stations.index):
             try: sub_df = self._get_dataframe(station_id)
             except FileNotFoundError: continue
-#            if self.site_details['Time step'] == 30:
-#                sub_df = get_downsampled_dataframe(sub_df)
             sub_df.columns = ['{}_{}'.format(x, str(i)) for x in sub_df.columns]
             df_list.append(sub_df)
+            if i == 3: break
         df = pd.concat(df_list, axis = 1)
         df = df.loc[str(int(self.site_details['Start year'])):]
         ds = df.to_xarray()
@@ -119,7 +120,8 @@ class bom_data_converter(object):
         _set_var_attrs(ds, nearest_stations)
         _set_global_attrs(ds, self.site_details)
 
-        return ds
+        # Generate qc flags and return
+        return xr.merge([ds, make_qc_flags(ds)])
     #--------------------------------------------------------------------------
     
     #--------------------------------------------------------------------------
@@ -147,17 +149,37 @@ class bom_data_converter(object):
 #------------------------------------------------------------------------------
 def _apply_range_limits(df):
 
+    """Screen implausible data from dataframe"""
+    
     for var in df.columns:
         lims = range_dict[var]
         df[var] = df[var].where(cond=(df[var] >= lims[0]) & (df[var] <= lims[1]))
     df['Precip'] = df.Precip.where(cond=((df.Precip < -1) |
                                          (df.Precip > 0.001)), other=0)
 #------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def _interpolate_missing(df):
+    
+    """Interpolate missing data where gap is less than 2 hours"""
+    
+    # Note that after interpolation, we need to reset any instances where the 
+    # accumulated precip is valid but the straight precip is not, because the 
+    # pandas cumulative sum effectively treats NaNs as zeros; we don't want 
+    # these zeros
+    df['u'], df['v'] = met_funcs.get_uv_from_wdws(df['Wd'],df['Ws'])
+    df['Precip_accum'] = df.Precip.cumsum()
+    df.interpolate(limit=4, inplace=True)
+    df['Ws'] = met_funcs.get_ws_from_uv(df['u'], df['v'])
+    df.Precip_accum.where(~pd.isnull(df.Precip), inplace=True)
+    df['Precip'] = df.Precip_accum - df.Precip_accum.shift()
+    df.drop(['u', 'v', 'Precip_accum'], axis=1, inplace=True)
+#------------------------------------------------------------------------------
     
 #------------------------------------------------------------------------------
 def _resample_dataframe(df):
 
-    """Downsample to 1 hour"""
+    """Downsample dataframe to 1 hour"""
 
     df['u'], df['v'] = met_funcs.get_uv_from_wdws(df['Wd'], df['Ws'])
     df.index = df.index + dt.timedelta(minutes = 30)
