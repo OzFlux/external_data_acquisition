@@ -32,7 +32,7 @@ def convert_Pa_to_kPa(ps):
 def get_Ah(T, q, ps):
 
     """Get absolute humidity (gH2O m^-3) from temperature (K), 
-       specific humidity (kgH2O kg^1) and pressure (kPa)"""
+       specific humidity (kgH2O kg moist air^1) and pressure (kPa)"""
        
     return get_e_from_q(q, ps * 10**3) / ((T * 8.3143) / 18)
 #------------------------------------------------------------------------------
