@@ -316,8 +316,7 @@ if __name__ == "__main__":
     
     # Get conversion class and write text data to nc file
     sites = utils.get_ozflux_site_list()
-    for site in sites.index[:1]:
+    for site in sites.index:
         conv_class = bom_data_converter(sites.loc[site])
-        ds = conv_class.get_dataset()
         conv_class.write_to_netcdf(nc_file_path)
 #------------------------------------------------------------------------------
