@@ -26,6 +26,7 @@ import os
 import pandas as pd
 import xarray as xr
 import sys
+
 import pdb
 
 #------------------------------------------------------------------------------
@@ -154,8 +155,7 @@ def _apply_range_limits(df):
     for var in df.columns:
         lims = range_dict[var]
         df[var] = df[var].where(cond=(df[var] >= lims[0]) & (df[var] <= lims[1]))
-    df['Precip'] = df.Precip.where(cond=((df.Precip < -1) |
-                                         (df.Precip > 0.001)), other=0)
+    df.Precip.where(~((df.Precip >= -0.01) & (df.Precip <= 0.01)), 0, inplace=True)
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -163,24 +163,19 @@ def _interpolate_missing(df):
     
     """Interpolate missing data where gap is less than 2 hours"""
     
-    # Note that after interpolation, we need to reset any instances where the 
-    # accumulated precip is valid but the straight precip is not, because the 
-    # pandas cumulative sum effectively treats NaNs as zeros; we don't want 
-    # these zeros
+    # Note that we don't do interpolation on precip data, which has been dealt with
     df['u'], df['v'] = met_funcs.get_uv_from_wdws(df['Wd'],df['Ws'])
-    df['Precip_accum'] = df.Precip.cumsum()
-    df.interpolate(limit=4, inplace=True)
+    var_list = df.columns.tolist()
+    var_list.remove('Precip')
+    for var in var_list: df[var].interpolate(limit=4, inplace=True)
     df['Ws'] = met_funcs.get_ws_from_uv(df['u'], df['v'])
-    df.Precip_accum.where(~pd.isnull(df.Precip), inplace=True)
-    df['Precip'] = df.Precip_accum - df.Precip_accum.shift()
-    df.drop(['u', 'v', 'Precip_accum'], axis=1, inplace=True)
+    df.drop(['u', 'v'], axis=1, inplace=True)
 #------------------------------------------------------------------------------
     
 #------------------------------------------------------------------------------
 def _resample_dataframe(df):
 
     """Downsample dataframe to 1 hour"""
-
     df['u'], df['v'] = met_funcs.get_uv_from_wdws(df['Wd'], df['Ws'])
     df.index = df.index + dt.timedelta(minutes = 30)
     rain_series = df['Precip']
@@ -197,12 +192,15 @@ def _resample_dataframe(df):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def get_instantaneous_precip(accum_precip, local_time):
+def get_instantaneous_precip(precip_accum, local_time):
 
-    inst_precip = accum_precip - accum_precip.shift()
-    time_bool = local_time / 9.5 == 1
-    inst_precip = inst_precip.where(~time_bool, accum_precip)
-    return inst_precip
+    precip_accum_interp = precip_accum.interpolate(limit=4)
+    precip_inst = precip_accum_interp - precip_accum_interp.shift()
+    reset_bool = local_time / 9.5 == 1
+    precip_inst.where(~reset_bool, precip_accum_interp, inplace=True)
+    neg_bool = (local_time / 9 == 1) & (precip_inst < 0)
+    precip_inst.where(~neg_bool, 0, inplace=True)
+    return precip_inst
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -297,7 +295,7 @@ def _set_var_attrs(ds, nearest_stations):
 #------------------------------------------------------------------------------
         
 #------------------------------------------------------------------------------
-range_dict = {'Precip': [-1, 100], 
+range_dict = {'Precip': [-0.01, 100], 
               'Ta': [-40, 60], 
               'Td': [-60, 60],
               'RH': [0, 100],
@@ -321,5 +319,5 @@ if __name__ == "__main__":
     for site in sites.index[:1]:
         conv_class = bom_data_converter(sites.loc[site])
         ds = conv_class.get_dataset()
-        #conv_class.write_to_netcdf(nc_file_path)
+        conv_class.write_to_netcdf(nc_file_path)
 #------------------------------------------------------------------------------
