@@ -119,10 +119,10 @@ class bom_data_converter(object):
 
         # Generate variable and global attribute dictionaries and write to xarray dataset
         _set_var_attrs(ds, nearest_stations)
+        ds = xr.merge([ds, make_qc_flags(ds)])
         _set_global_attrs(ds, self.site_details)
 
-        # Generate qc flags and return
-        return xr.merge([ds, make_qc_flags(ds)])
+        return ds
     #--------------------------------------------------------------------------
     
     #--------------------------------------------------------------------------
@@ -275,7 +275,7 @@ def _set_var_attrs(ds, nearest_stations):
                  'Wg': {'long_name': 'Wind gust',
                         'units': 'm/s'}}
 
-    generic_dict = {'instrument': '', 'valid_range': (-1e+35,1e+35),
+    generic_dict = {'instrument': '', 'valid_range': '-1e+35,1e+35',
                     'missing_value': -9999, 'height': '',
                     'standard_name': '', 'group_name': '',
                     'serial_number': ''}
