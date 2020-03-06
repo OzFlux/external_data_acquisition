@@ -571,7 +571,7 @@ def _process_data(data, configs):
     meta['product'] = configs.product
     meta['band'] = configs.band
     meta['retrieval_type'] = configs.retrieval_type
-    meta['qcFiltered'] = 'False'
+    meta['qcFiltered'] = configs.qcFiltered
     meta['site'] = configs.site
     band_attrs = get_band_list(configs.product)[configs.band]
     meta.update(band_attrs)
@@ -593,11 +593,10 @@ def _process_data(data, configs):
                                                         meta['ncols'])
                 data_dict['arrays'].append(new_array)
     stacked_array = np.dstack(data_dict['arrays'])
-
     # Apply scaling (if applicable - note that if data is derived from
     # collections and qc is set to True, collection has already had scaling
     # applied!)
-    if not (meta['qcFiltered'] and 'by_collection' in meta['retrieval_type']):
+    if not (meta['qcFiltered']=='True' and 'by_collection' in meta['retrieval_type']):
         try: stacked_array *= float(meta['scale'])
         except (TypeError, ValueError): pass
 

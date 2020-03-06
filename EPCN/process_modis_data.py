@@ -19,7 +19,8 @@ import sys
 ### MODULES (CUSTOM) ###
 #------------------------------------------------------------------------------
 
-sys.path.append('../MODIS')
+this_path = os.path.join(os.path.dirname(__file__), '../MODIS')
+sys.path.append(this_path)
 import modis_functions_rest as mfr
 import utils
 
@@ -35,6 +36,33 @@ output_path = configs['nc_data_write_paths']['modis']
 
 #------------------------------------------------------------------------------
 ### MAIN PROGRAM
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def add_attrs(ds):
+    {'Functions': '',
+     'QC_version': 'PyFluxPro V0.1.3',
+     'end_date': '2018-03-30 09:30:00',
+     'end_datetime': '2018-03-30 09:30:00',
+     'latitude': '-13.0769',
+     'longitude': '131.1178',
+     'nc_level': 'L1',
+     'nc_nrecs': '317137',
+     'nc_rundatetime': '2018-04-14 19:21:25',
+     'site_name': 'AdelaideRiver',
+     'start_date': '2000-02-26 09:30:00',
+     'start_datetime': '2000-02-26 09:30:00',
+     'time_step': '30',
+     'time_zone': 'Australia/Darwin'}
+
+    pass
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def get_stringdates(ds):
+
+    start_date = dt.datetime.strftime(pd.to_datetime(ds.time[0].item()), 
+                                      '%Y-%m-%d %H:%M:%S')
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -118,9 +146,9 @@ if __name__ == "__main__":
                                        first_date_modis, last_date_modis,
                                        km_dims, km_dims, site, qcfiltered=True)
 
-                # Reduce the number of pixels to 5 x 5
+                # Reduce the number of pixels to 3 x 3
                 x.data_array = mfr.get_pixel_subset(x.data_array,
-                                                    pixels_per_side = 5)
+                                                    pixels_per_side = 3)
 
                 # Get outputs and write to file (plots then nc)
                 x.plot_data(plot_to_screen=False, save_to_path=full_plot_path)
