@@ -171,6 +171,7 @@ class modis_data():
     #--------------------------------------------------------------------------
     def plot_data(self, pixel='centre', plot_to_screen=True, save_to_path=None):
 
+        pd.plotting.register_matplotlib_converters()
         state = mpl.is_interactive()
         if plot_to_screen: plt.ion()
         if not plot_to_screen: plt.ioff()

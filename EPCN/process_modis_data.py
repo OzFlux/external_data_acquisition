@@ -11,9 +11,12 @@ Created on Mon Feb  3 10:32:50 2020
 #------------------------------------------------------------------------------
 
 import datetime as dt
+import numpy as np
 import os
 import pandas as pd
 import sys
+import xarray as xr
+import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -57,6 +60,20 @@ def _band_short_name(band):
          '250m_16_days_NDVI': 'NDVI', 'Lai_500m': 'LAI', 'Fpar_500m': 'FPAR', 
          'ET_500m': 'ET', 'Gpp_500m': 'GPP'}
     return d[band]
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def make_qc_flags(ds):
+
+    """Generate QC flags for all variables in the ds"""
+
+    da_list = []
+    for var in ds.variables:
+        if var in ds.dims: continue
+        da = xr.where(~np.isnan(ds[var]), 0, 10)
+        da.name = var + '_QCFlag'
+        da_list.append(da)
+    return xr.merge(da_list)
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -171,5 +188,7 @@ if __name__ == "__main__":
                 resampled_ds = ds.resample({'time': str_step}).interpolate()
                 resampled_ds.time.encoding = {'units': 'days since 1800-01-01',
                                               '_FillValue': None}
-                _set_global_attrs(resampled_ds, site_details)
-                resampled_ds.to_netcdf(full_nc_path, format='NETCDF4')
+                final_ds = xr.merge([resampled_ds, make_qc_flags(resampled_ds)])
+                final_ds.attrs = resampled_ds.attrs
+                _set_global_attrs(final_ds, site_details)
+                final_ds.to_netcdf(full_nc_path, format='NETCDF4')
