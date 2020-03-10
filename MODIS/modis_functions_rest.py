@@ -23,6 +23,7 @@ from types import SimpleNamespace
 import webbrowser
 import xarray as xr
 
+import pdb
 #------------------------------------------------------------------------------
 ### Remote configurations ###
 #------------------------------------------------------------------------------
@@ -30,7 +31,7 @@ import xarray as xr
 api_base_url = 'https://modis.ornl.gov/rst/api/v1/'
 
 #------------------------------------------------------------------------------
-### BEGINNING OF CLASS SECTION ###
+### CLASSES ###
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -106,6 +107,27 @@ class modis_data():
     #--------------------------------------------------------------------------
 
     #--------------------------------------------------------------------------
+    def apply_spatial_filter(self, mult=1.5):
+    
+        """Filter outliers from the 2d spatial array"""
+
+        da = cp.deepcopy(self.data_array)
+        sub_arrs = []
+        for this_date in da.time:
+            arr_2d = da.sel(time=this_date)
+            n_valid = sum(~np.isnan(arr_2d.data)).sum()
+            if n_valid == 0: next
+            pct75 = np.nanpercentile(arr_2d, 75)
+            pct25 = np.nanpercentile(arr_2d, 25)
+            iqr = pct75 - pct25
+            range_min = pct25 - mult * iqr
+            range_max = pct75 + mult * iqr
+            sub_arrs.append(arr_2d.where((arr_2d >= range_min) & 
+                                         (arr_2d <= range_max), np.nan))
+        return xr.concat(sub_arrs, dim='time').transpose('y', 'x', 'time')
+    #--------------------------------------------------------------------------
+    
+    #--------------------------------------------------------------------------
     def data_array_by_pixels(self, interpolate_missing=True,
                              smooth_signal=False):
 
@@ -135,14 +157,10 @@ class modis_data():
     def get_spatial_mean(self, filter_outliers=True, interpolate_missing=True,
                          smooth_signal=False):
 
-        """Must be a better way to index the time steps than as numpy arrays"""
+        """Get mean of spatial array"""
 
-        da = cp.deepcopy(self.data_array)
-        idx = pd.to_datetime(da.time.data)
-        idx.name = 'time'
-        if filter_outliers:
-            for i in range(da.data.shape[2]):
-                da.data[:, :, i] = _median_filter(da.data[:, :, i])
+        if filter_outliers: da = self.apply_spatial_filter()
+        else: da = self.data_array
         s = da.mean(['x', 'y']).to_series()
         if interpolate_missing or smooth_signal: s = _interp_missing(s)
         if smooth_signal: s = pd.Series(_smooth_signal(s), index=s.index)
@@ -303,11 +321,7 @@ class modis_data_network(modis_data):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-### END OF CLASS SECTION ###
-#------------------------------------------------------------------------------
-
-#------------------------------------------------------------------------------
-### BEGINNING OF FUNCTION SECTION ###
+### FUNCTIONS ###
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -530,22 +544,6 @@ def _interp_missing(series):
     f = interpolate.Akima1DInterpolator(days[valid_idx], data[valid_idx])
     return pd.Series(f(days), index=series.index)
 #------------------------------------------------------------------------------
-
-#--------------------------------------------------------------------------
-def _median_filter(arr, mult = 1.5):
-
-    """Filter outliers from the 2d spatial array"""
-
-    n_valid = sum(~np.isnan(arr)).sum()
-    if n_valid == 0: return np.nan
-    pct75 = np.nanpercentile(arr, 75)
-    pct25 = np.nanpercentile(arr, 25)
-    iqr = pct75 - pct25
-    range_min = pct25 - mult * iqr
-    range_max = pct75 + mult * iqr
-    filt_arr = np.where((arr < range_min) | (arr > range_max), np.nan, arr)
-    return np.nanmean(filt_arr)
-#--------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
 def modis_to_from_pydatetime(date):
@@ -800,8 +798,4 @@ def _do_common_checks(*args):
             'start_date': avail_dates[start_idx]['modis_date'],
             'end_date': avail_dates[end_idx]['modis_date'],
             'qcFiltered': 'True' if qcfiltered else False}
-#------------------------------------------------------------------------------
-
-#------------------------------------------------------------------------------
-### END OF FUNCTION SECTION ###
 #------------------------------------------------------------------------------

@@ -42,12 +42,12 @@ output_path = configs['nc_data_write_paths']['modis']
 #------------------------------------------------------------------------------
 def _product_band_to_retrieve():
 
-    return {#'MOD09A1': ['sur_refl_b07'],
-            #'MOD11A2': ['LST_Day_1km', 'LST_Night_1km'],
-            'MOD13Q1': ['250m_16_days_EVI', '250m_16_days_NDVI']}
-            #'MCD15A3H': ['Lai_500m', 'Fpar_500m'],
-            #'MOD16A2': ['ET_500m'],
-            #'MOD17A2H': ['Gpp_500m']}
+    return {'MOD09A1': ['sur_refl_b07'],
+            'MOD11A2': ['LST_Day_1km', 'LST_Night_1km'],
+            'MOD13Q1': ['250m_16_days_EVI', '250m_16_days_NDVI'],
+            'MCD15A3H': ['Lai_500m', 'Fpar_500m'],
+            'MOD16A2': ['ET_500m'],
+            'MOD17A2H': ['Gpp_500m']}
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -126,7 +126,7 @@ if __name__ == "__main__":
             short_name = _band_short_name(band)
 
             # Get site data and write to netcdf
-            for site in sites.index[:1]:
+            for site in sites.index:
                 site_details = sites.loc[site]
                 print('Retrieving data for site {}:'.format(site))
                 target = os.path.join(this_path,
@@ -173,4 +173,4 @@ if __name__ == "__main__":
                 resampled_ds.time.encoding = {'units': 'days since 1800-01-01',
                                               '_FillValue': None}
                 _set_global_attrs(resampled_ds, site_details)
-#                resampled_ds.to_netcdf(full_nc_path, format='NETCDF4')
+                resampled_ds.to_netcdf(full_nc_path, format='NETCDF4')
