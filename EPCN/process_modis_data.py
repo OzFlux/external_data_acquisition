@@ -14,6 +14,7 @@ import datetime as dt
 import os
 import pandas as pd
 import sys
+import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -39,41 +40,14 @@ output_path = configs['nc_data_write_paths']['modis']
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def add_attrs(ds):
-    {'Functions': '',
-     'QC_version': 'PyFluxPro V0.1.3',
-     'end_date': '2018-03-30 09:30:00',
-     'end_datetime': '2018-03-30 09:30:00',
-     'latitude': '-13.0769',
-     'longitude': '131.1178',
-     'nc_level': 'L1',
-     'nc_nrecs': '317137',
-     'nc_rundatetime': '2018-04-14 19:21:25',
-     'site_name': 'AdelaideRiver',
-     'start_date': '2000-02-26 09:30:00',
-     'start_datetime': '2000-02-26 09:30:00',
-     'time_step': '30',
-     'time_zone': 'Australia/Darwin'}
-
-    pass
-#------------------------------------------------------------------------------
-
-#------------------------------------------------------------------------------
-def get_stringdates(ds):
-
-    start_date = dt.datetime.strftime(pd.to_datetime(ds.time[0].item()), 
-                                      '%Y-%m-%d %H:%M:%S')
-#------------------------------------------------------------------------------
-
-#------------------------------------------------------------------------------
 def _product_band_to_retrieve():
 
-    return {'MOD09A1': ['sur_refl_b07'],
-            'MOD11A2': ['LST_Day_1km', 'LST_Night_1km'],
-            'MOD13Q1': ['250m_16_days_EVI', '250m_16_days_NDVI'],
-            'MCD15A3H': ['Lai_500m', 'Fpar_500m'],
-            'MOD16A2': ['ET_500m'],
-            'MOD17A2H': ['Gpp_500m']}
+    return {#'MOD09A1': ['sur_refl_b07'],
+            #'MOD11A2': ['LST_Day_1km', 'LST_Night_1km'],
+            'MOD13Q1': ['250m_16_days_EVI', '250m_16_days_NDVI']}
+            #'MCD15A3H': ['Lai_500m', 'Fpar_500m'],
+            #'MOD16A2': ['ET_500m'],
+            #'MOD17A2H': ['Gpp_500m']}
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -87,12 +61,52 @@ def _band_short_name(band):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
+def _set_global_attrs(ds, site_details):
+    
+    start_date = dt.datetime.strftime(pd.to_datetime(ds.time[0].item()), 
+                                      '%Y-%m-%d %H:%M:%S')
+    end_date = dt.datetime.strftime(pd.to_datetime(ds.time[-1].item()), 
+                                    '%Y-%m-%d %H:%M:%S')
+    run_date = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d %H:%M:%S')
+    nc_nrecs = len(ds.time)
+
+    d = {'start_date': start_date,
+         'end_date': end_date,
+         'nc_nrecs': nc_nrecs,
+         'site_name': ds.attrs.pop('site').replace(' ',''),
+         'time_step': str(int(site_details['Time step'])),
+         'time_zone': site_details['Time zone'],
+         'nc_rundatetime': run_date}
+    
+    ds.attrs.update(d)
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def _set_var_attrs():
+    
+    {'sg_order': '5',
+     'evi_interpolate': 'linear',
+     'sg_num_points': '5',
+     'instrument': 'not defined',
+     'valid_range': '-1e+35,1e+35',
+     'ancillary_variables': 'not defined',
+     'evi_sd_threshold': '0.05',
+     'horiz_resolution': '250m',
+     'height': 'not defined',
+     'long_name': 'MODIS EVI, smoothed and interpolated',
+     'standard_name': 'not defined',
+     'evi_quality_threshold': '1',
+     'units': 'none',
+     'serial_number': 'not defined',
+     'cutout_size': '3',
+     'evi_smooth_filter': 'Savitsky-Golay'}
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
 if __name__ == "__main__":
 
     # Get sites info for processing
     sites = utils.get_ozflux_site_list(master_file_path)
-
-    products_dict = _product_band_to_retrieve()
 
     # Get list of ozflux sites that are in the MODIS collection (note Wombat
     # has designated site name 'Wombat', so change in dict)
@@ -102,20 +116,19 @@ if __name__ == "__main__":
     coll_dict['Wombat State Forest'] = coll_dict.pop('Wombat')
 
     # Iterate on product (create dirs where required)
+    products_dict = _product_band_to_retrieve()
     for product in products_dict:
         this_path = os.path.join(output_path, product)
         if not os.path.exists(this_path): os.makedirs(this_path)
 
         # Iterate on band
         for band in products_dict[product]:
-
             short_name = _band_short_name(band)
 
             # Get site data and write to netcdf
-            for site in sites.index:
-
+            for site in sites.index[:1]:
+                site_details = sites.loc[site]
                 print('Retrieving data for site {}:'.format(site))
-
                 target = os.path.join(this_path,
                                       '{0}_{1}'.format(site.replace(' ', ''),
                                                        short_name))
@@ -140,11 +153,10 @@ if __name__ == "__main__":
                 # Get sites not in the collection
                 else:
                     km_dims = mfr.get_dims_reqd_for_npixels(product, 5)
-                    x = mfr.modis_data(product, band,
-                                       sites.loc[site, 'Latitude'],
-                                       sites.loc[site, 'Longitude'],
-                                       first_date_modis, last_date_modis,
-                                       km_dims, km_dims, site, qcfiltered=True)
+                    x = mfr.modis_data(product, band, site_details.Latitude, 
+                                       site_details.Longitude, first_date_modis, 
+                                       last_date_modis, km_dims, km_dims, site, 
+                                       qcfiltered=True)
 
                 # Reduce the number of pixels to 3 x 3
                 x.data_array = mfr.get_pixel_subset(x.data_array,
@@ -152,11 +164,13 @@ if __name__ == "__main__":
 
                 # Get outputs and write to file (plots then nc)
                 x.plot_data(plot_to_screen=False, save_to_path=full_plot_path)
-                da = (pd.DataFrame({short_name: x.get_spatial_mean(),
+                ds = (pd.DataFrame({short_name: x.get_spatial_mean(),
                                     short_name + '_smoothed': x.get_spatial_mean(smooth_signal=True)})
                       .to_xarray())
-                da.attrs = x.data_array.attrs
-                resampled_da = da.resample({'time': '30T'}).interpolate()
-                resampled_da.time.encoding = {'units': 'days since 1800-01-01',
+                ds.attrs = x.data_array.attrs
+                str_step = str(int(site_details['Time step'])) + 'T'
+                resampled_ds = ds.resample({'time': str_step}).interpolate()
+                resampled_ds.time.encoding = {'units': 'days since 1800-01-01',
                                               '_FillValue': None}
-                resampled_da.to_netcdf(full_nc_path, format='NETCDF4')
+                _set_global_attrs(resampled_ds, site_details)
+#                resampled_ds.to_netcdf(full_nc_path, format='NETCDF4')
