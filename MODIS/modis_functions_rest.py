@@ -23,7 +23,6 @@ from types import SimpleNamespace
 import webbrowser
 import xarray as xr
 
-import pdb
 #------------------------------------------------------------------------------
 ### Remote configurations ###
 #------------------------------------------------------------------------------
