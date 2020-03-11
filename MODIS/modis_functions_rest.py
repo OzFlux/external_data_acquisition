@@ -617,13 +617,16 @@ def _process_data(data, configs):
     meta['qcFiltered'] = configs.qcFiltered
     meta['site'] = configs.site
     band_attrs = get_band_list(configs.product)[configs.band]
+    prod_attrs = get_product_list()[configs.product]
+    prod_attrs.pop('description')
     meta.update(band_attrs)
+    meta.update(prod_attrs)
     if 'scale_factor' in meta: meta['scale'] = meta.pop('scale_factor')
     if not 'scale_factor' in meta and not 'scale' in meta:
         meta['scale'] = 'Not available'
-    data_dict = {'dates': [], 'arrays': [], 'metadata': meta}
 
     # Iterate on data list and convert to 3D numpy array
+    data_dict = {'dates': [], 'arrays': [], 'metadata': meta}
     for i in data:
         for j in i['subset']:
             if j['band'] == meta['band']:
