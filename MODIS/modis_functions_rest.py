@@ -68,6 +68,10 @@ class modis_data():
         * MODIS data class containing the following:
             * band (attribute): MODIS band selected for retrieval
             * cellsize (attribute): actual width of pixel in m
+
+    Todo:
+        * Finish docstrings
+        * Be consistent on output (dataset versus data array)
     '''
 
     def __init__(self, product, band, latitude, longitude,
@@ -632,6 +636,7 @@ def _process_data(data, configs):
                                                         meta['ncols'])
                 data_dict['arrays'].append(new_array)
     stacked_array = np.dstack(data_dict['arrays'])
+
     # Apply scaling (if applicable - note that if data is derived from
     # collections and qc is set to True, collection has already had scaling
     # applied!)
