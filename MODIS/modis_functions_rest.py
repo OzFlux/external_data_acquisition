@@ -23,6 +23,8 @@ from types import SimpleNamespace
 import webbrowser
 import xarray as xr
 
+import pdb
+
 #------------------------------------------------------------------------------
 ### Remote configurations ###
 #------------------------------------------------------------------------------
@@ -153,20 +155,37 @@ class modis_data():
     #--------------------------------------------------------------------------
 
     #--------------------------------------------------------------------------
+    def get_pixel_by_row_col(row, col, filter_outliers=True, 
+                             interpolate_missing=True, smooth_signal=False):
+        
+        pass
+    #--------------------------------------------------------------------------
+
+    #--------------------------------------------------------------------------
     def get_spatial_mean(self, filter_outliers=True, interpolate_missing=True,
                          smooth_signal=False):
 
-        """Get mean of spatial array"""
+        """Get mean time series of 2d spatial array"""
 
-        if filter_outliers: da = self.apply_spatial_filter()
-        else: da = self.data_array
-        s = da.mean(['x', 'y']).to_series()
-        if interpolate_missing or smooth_signal: s = _interp_missing(s)
-        if smooth_signal: s = pd.Series(_smooth_signal(s), index=s.index)
-        s.name = 'Mean'
-        return s
+        if filter_outliers: ds = self.apply_spatial_filter()
+        else: ds = self.data_array
+        da = ds.mean(['x', 'y'])
+        if interpolate_missing or smooth_signal:
+            da.data = _interp_missing(da.to_series())
+        if smooth_signal: da.data = _smooth_signal(da.to_series())
+        new_ds = da.to_dataset()
+        new_ds.attrs = ds.attrs
+        new_ds.attrs['nrows'] = 1
+        new_ds.attrs['ncols'] = 1
+        smoothing = 'None' if not smooth_signal else 'Savitzky-Golay'
+        interpolation = str(interpolate_missing)
+        analysis = ('Spatial mean of {0} rows x {1} cols'
+                    .format(str(ds.attrs['nrows']), str(ds.attrs['ncols'])))
+        new_ds[new_ds.attrs['band']].attrs = {'smooth_filter': smoothing,
+                                              'interpolated': interpolation,
+                                              'analysis': analysis}
+        return new_ds
     #--------------------------------------------------------------------------
-
 
     #--------------------------------------------------------------------------
     def plot_data(self, pixel='centre', plot_to_screen=True, save_to_path=None):
