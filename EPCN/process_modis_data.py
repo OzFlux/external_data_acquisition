@@ -16,7 +16,6 @@ import os
 import pandas as pd
 import sys
 import xarray as xr
-import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -98,27 +97,6 @@ def _set_global_attrs(ds, site_details):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def _set_var_attrs():
-    
-    {'sg_order': '5',
-     'evi_interpolate': 'linear',
-     'sg_num_points': '5',
-     'instrument': 'not defined',
-     'valid_range': '-1e+35,1e+35',
-     'ancillary_variables': 'not defined',
-     'evi_sd_threshold': '0.05',
-     'horiz_resolution': '250m',
-     'height': 'not defined',
-     'long_name': 'MODIS EVI, smoothed and interpolated',
-     'standard_name': 'not defined',
-     'evi_quality_threshold': '1',
-     'units': 'none',
-     'serial_number': 'not defined',
-     'cutout_size': '3',
-     'evi_smooth_filter': 'Savitsky-Golay'}
-#------------------------------------------------------------------------------
-
-#------------------------------------------------------------------------------
 if __name__ == "__main__":
 
     # Get sites info for processing
@@ -180,9 +158,9 @@ if __name__ == "__main__":
 
                 # Get outputs and write to file (plots then nc)
                 x.plot_data(plot_to_screen=False, save_to_path=full_plot_path)
-                ds = (pd.DataFrame({short_name: x.get_spatial_mean(),
-                                    short_name + '_smoothed': x.get_spatial_mean(smooth_signal=True)})
-                      .to_xarray())
+                ds = xr.merge([x.get_spatial_mean().rename({band: short_name}),
+                               x.get_spatial_mean(smooth_signal=True)
+                               .rename({band: short_name + '_smoothed'})])
                 ds.attrs = x.data_array.attrs
                 str_step = str(int(site_details['Time step'])) + 'T'
                 resampled_ds = ds.resample({'time': str_step}).interpolate()
