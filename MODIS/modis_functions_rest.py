@@ -23,8 +23,6 @@ from types import SimpleNamespace
 import webbrowser
 import xarray as xr
 
-import pdb
-
 #------------------------------------------------------------------------------
 ### Remote configurations ###
 #------------------------------------------------------------------------------
@@ -109,7 +107,7 @@ class modis_data():
 
     #--------------------------------------------------------------------------
     def apply_spatial_filter(self, mult=1.5):
-    
+
         """Filter outliers from the 2d spatial array"""
 
         da = cp.deepcopy(self.data_array)
@@ -123,11 +121,11 @@ class modis_data():
             iqr = pct75 - pct25
             range_min = pct25 - mult * iqr
             range_max = pct75 + mult * iqr
-            sub_arrs.append(arr_2d.where((arr_2d >= range_min) & 
+            sub_arrs.append(arr_2d.where((arr_2d >= range_min) &
                                          (arr_2d <= range_max), np.nan))
         return xr.concat(sub_arrs, dim='time').transpose('y', 'x', 'time')
     #--------------------------------------------------------------------------
-    
+
     #--------------------------------------------------------------------------
     def data_array_by_pixels(self, interpolate_missing=True,
                              smooth_signal=False):
@@ -155,10 +153,18 @@ class modis_data():
     #--------------------------------------------------------------------------
 
     #--------------------------------------------------------------------------
-    def get_pixel_by_row_col(row, col, filter_outliers=True, 
+    def get_pixel_by_row_col(self, row, col, filter_outliers=True,
                              interpolate_missing=True, smooth_signal=False):
-        
-        pass
+
+        try: assert row < self.data_array.nrows
+        except: raise IndexError('Row number exceeds number of rows')
+        try: assert row < self.data_array.ncols
+        except: raise IndexError('Column number exceeds number of columns')
+        if filter_outliers: ds = self.apply_spatial_filter()
+        else: ds = self.data_array
+        da = self.data_array.sel(x=self.data_array.x[1], y=self.data_array.y[1])
+        new_ds = _do_proc(da, locals())
+        return new_ds
     #--------------------------------------------------------------------------
 
     #--------------------------------------------------------------------------
@@ -170,20 +176,10 @@ class modis_data():
         if filter_outliers: ds = self.apply_spatial_filter()
         else: ds = self.data_array
         da = ds.mean(['x', 'y'])
-        if interpolate_missing or smooth_signal:
-            da.data = _interp_missing(da.to_series())
-        if smooth_signal: da.data = _smooth_signal(da.to_series())
-        new_ds = da.to_dataset()
-        new_ds.attrs = ds.attrs
-        new_ds.attrs['nrows'] = 1
-        new_ds.attrs['ncols'] = 1
-        smoothing = 'None' if not smooth_signal else 'Savitzky-Golay'
-        interpolation = str(interpolate_missing)
-        analysis = ('Spatial mean of {0} rows x {1} cols'
-                    .format(str(ds.attrs['nrows']), str(ds.attrs['ncols'])))
-        new_ds[new_ds.attrs['band']].attrs = {'smooth_filter': smoothing,
-                                              'interpolated': interpolation,
-                                              'analysis': analysis}
+        da.attrs = ds.attrs
+        new_ds = _do_proc(da, locals())
+        new_ds[new_ds.band].attrs['analysis'] = (
+            'Mean of {0} rows x {1} columns'.format(ds.nrows, ds.ncols))
         return new_ds
     #--------------------------------------------------------------------------
 
@@ -490,7 +486,7 @@ def get_qc_details(product = None):
     # Define qc dict
     d = {'M*D09A1': {'qc_name': 'sur_refl_qc_500m',
                      'bits': [0, 1], 'reliability_threshold': 1,
-                     'bitmap': {'0': 'Ideal quality', 
+                     'bitmap': {'0': 'Ideal quality',
                                 '1': 'Less than ideal quality',
                                 '2': 'Not produced - cloud',
                                 '3': 'Not produced - other'}},
@@ -549,6 +545,32 @@ def get_qc_details(product = None):
     query = '{}*{}'.format(product[:1], product[2:])
     try: return d[query]
     except KeyError: return
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def _do_proc(da, locals_dict):
+
+    """Apply interpolations and smoothing to data_array, convert to dataset
+       and write variable attributes """
+
+    if locals_dict['interpolate_missing'] or locals_dict['smooth_signal']:
+        da.data = _interp_missing(da.to_series())
+    if locals_dict['smooth_signal']: da.data = _smooth_signal(da.to_series())
+    new_ds = da.to_dataset()
+    new_ds.attrs = da.attrs
+    new_ds.attrs['nrows'] = 1
+    new_ds.attrs['ncols'] = 1
+    smoothing = ('False' if not locals_dict['smooth_signal'] == 'True'
+                 else 'Savitzky-Golay')
+    new_ds[new_ds.band].attrs = (
+        {'spatial_outliers_removed': locals_dict['filter_outliers'],
+         'smooth_filter': smoothing,
+         'interpolated': locals_dict['interpolate_missing']})
+    if 'x' in new_ds.coords and 'y' in new_ds.coords:
+        new_ds[new_ds.band].attrs['x'] = new_ds.coords['x'].item()
+        new_ds[new_ds.band].attrs['y'] = new_ds.coords['y'].item()
+        new_ds = new_ds.reset_coords(['x', 'y'], drop=True)
+    return new_ds
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
