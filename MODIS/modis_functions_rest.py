@@ -22,6 +22,7 @@ from time import sleep
 from types import SimpleNamespace
 import webbrowser
 import xarray as xr
+import pdb
 
 #------------------------------------------------------------------------------
 ### Remote configurations ###
@@ -564,12 +565,11 @@ def _do_proc(da, locals_dict):
     new_ds.attrs = da.attrs
     new_ds.attrs['nrows'] = 1
     new_ds.attrs['ncols'] = 1
-    smoothing = ('False' if not locals_dict['smooth_signal'] == 'True'
-                 else 'Savitzky-Golay')
+    smoothing = ('Savitzky-Golay' if locals_dict['smooth_signal'] else 'False')
     new_ds[new_ds.band].attrs = (
-        {'spatial_outliers_removed': locals_dict['filter_outliers'],
+        {'spatial_outliers_removed': str(locals_dict['filter_outliers']),
          'smooth_filter': smoothing,
-         'interpolated': locals_dict['interpolate_missing']})
+         'interpolated': str(locals_dict['interpolate_missing'])})
     if 'x' in new_ds.coords and 'y' in new_ds.coords:
         new_ds[new_ds.band].attrs['x'] = new_ds.coords['x'].item()
         new_ds[new_ds.band].attrs['y'] = new_ds.coords['y'].item()

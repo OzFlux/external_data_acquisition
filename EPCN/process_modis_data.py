@@ -16,6 +16,7 @@ import os
 import pandas as pd
 import sys
 import xarray as xr
+import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -97,6 +98,15 @@ def _set_global_attrs(ds, site_details):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
+def _set_var_attrs(ds):
+    
+    for this_var in list(ds.variables):
+        if this_var in ds.dims: continue
+        ds[this_var].attrs['units'] = ds.units
+        ds[this_var].attrs['valid_range'] = '1e+35,-1e+35'
+#------------------------------------------------------------------------------
+    
+#------------------------------------------------------------------------------
 if __name__ == "__main__":
 
     # Get sites info for processing
@@ -162,6 +172,7 @@ if __name__ == "__main__":
                                x.get_spatial_mean(smooth_signal=True)
                                .rename({band: short_name + '_smoothed'})])
                 ds.attrs = x.data_array.attrs
+                _set_var_attrs(ds)
                 str_step = str(int(site_details['Time step'])) + 'T'
                 resampled_ds = ds.resample({'time': str_step}).interpolate()
                 resampled_ds.time.encoding = {'units': 'days since 1800-01-01',
