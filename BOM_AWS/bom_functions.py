@@ -21,6 +21,7 @@ import requests
 from time import sleep
 from timezonefinder import TimezoneFinder as tzf
 import zipfile
+import pdb
 
 #------------------------------------------------------------------------------
 ### REMOTE CONFIGURATIONS ###
@@ -73,7 +74,7 @@ class bom_data_getter(object):
         start_list = ['dd', station_id, station_details.station_name.zfill(40)]
         try:
             local_datetime = self.get_local_datetime(datetime,
-                                                     station_details.timezone)
+                                                     station_details.time_zone)
             local_datetime_str = dt.datetime.strftime(local_datetime,
                                                       '%Y,%m,%d,%H,%M')
         except UnknownTimeZoneError:
