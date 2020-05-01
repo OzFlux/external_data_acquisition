@@ -345,22 +345,6 @@ class modis_data_network(modis_data):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def _error_codes(json_obj):
-
-    d = {'400': 'Invalid band for product',
-         '404': 'Product not found',
-         '5xx': 'Server error'}
-
-    if json_obj.status_code == 200: return
-    if json_obj.status_code / 100 == 5: print(d['5xx']); return
-    try:
-        error = d[str(json_obj.status_code)]
-    except KeyError:
-        error = 'Unknown error code ({})'.format(str(json_obj.status_code))
-    raise RuntimeError('retrieval failed - {}'.format(error))
-#------------------------------------------------------------------------------
-
-#------------------------------------------------------------------------------
 def get_band_list(product, include_details = True):
 
     """Get available bands for a given product"""
