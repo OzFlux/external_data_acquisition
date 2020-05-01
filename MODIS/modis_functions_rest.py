@@ -22,7 +22,6 @@ from time import sleep
 from types import SimpleNamespace
 import webbrowser
 import xarray as xr
-import pdb
 
 #------------------------------------------------------------------------------
 ### Remote configurations ###
@@ -719,7 +718,8 @@ def request_subset_by_URLstring(URLstr):
         except ConnectionError:
             response = None
             sleep(5)
-    raise ConnectionError('Connection error - server not responding')
+    raise ConnectionError('Connection error - server not responding after '
+                          '5 tries, giving up...')
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -736,7 +736,8 @@ def get_config_obj_by_coords(product, band, latitude, longitude,
                              above_below_km=0, left_right_km=0,
                              site=None, qcfiltered=False):
 
-    """Docstring here"""
+    """Create a configuration object with all required parameters for
+       coordinate-based requests"""
 
     try:
         assert isinstance(above_below_km, int)
@@ -757,7 +758,8 @@ def get_config_obj_by_network_site(product, band, network_name, site_ID,
                                    start_date=None, end_date=None,
                                    qcfiltered=False):
 
-    """Docstring here"""
+    """Create a configuration object with all required parameters for
+       collection-based requests"""
 
     # Check network and site ID are legit
     try:
