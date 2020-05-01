@@ -54,7 +54,7 @@ def check_seen_files(opendap_url, base_dir, site_list):
     """Check local files to see which of the available files on the opendap
        server have been seen and processed"""
 
-    site_list = [x.replace(' ','') for x in site_list]
+#    site_list = [x.replace(' ','') for x in site_list]
     opendap_files = _list_opendap_dirs(opendap_url)
     month_dirs = np.unique([x[:6] for x in opendap_files]).astype(str)
     check_paths = [os.path.join(base_dir, 'Monthly_files', x) for x in month_dirs]
@@ -64,7 +64,7 @@ def check_seen_files(opendap_url, base_dir, site_list):
     for site in seen_df.columns:
         seen_dirs = []
         for target_path in check_paths:
-            target = os.path.join(target_path, '{}.nc'.format(site))
+            target = os.path.join(target_path, '{}.nc'.format(site.replace(' ', '')))
             try:
                 nc = netCDF4.Dataset(target)
                 dts = sorted(netCDF4.num2date(nc.variables['time'][:],
