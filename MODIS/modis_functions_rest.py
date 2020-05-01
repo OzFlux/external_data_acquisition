@@ -347,15 +347,16 @@ class modis_data_network(modis_data):
 #------------------------------------------------------------------------------
 def _error_codes(json_obj):
 
-    d = {400: 'Invalid band for product',
-         404: 'Product not found'}
+    d = {'400': 'Invalid band for product',
+         '404': 'Product not found',
+         '5xx': 'Server error'}
 
-    status_code = json_obj.status_code
-    if status_code == 200: return
+    if json_obj.status_code == 200: return
+    if json_obj.status_code / 100 == 5: print(d['5xx']); return
     try:
-        error = d[status_code]
+        error = d[str(json_obj.status_code)]
     except KeyError:
-        error = 'Unknown error code ({})'.format(str(status_code))
+        error = 'Unknown error code ({})'.format(str(json_obj.status_code))
     raise RuntimeError('retrieval failed - {}'.format(error))
 #------------------------------------------------------------------------------
 
@@ -723,15 +724,18 @@ def request_subset_by_URLstring(URLstr):
     header = {'Accept': 'application/json'}
     for this_try in range(5):
         try:
-            response = requests.get(URLstr, headers = header)
-            break
+            response = requests.get(URLstr, headers=header)
+            if response.status_code == 200: return json.loads(response.text)
+            if response.status_code / 100 == 5:
+                raise ConnectionError('Server error {}'
+                                      .format(str(response.status_code)))
+            else:
+                raise RuntimeError('Unknown error: {}'
+                                   .format(str(response.status_code)))
         except ConnectionError:
             response = None
             sleep(5)
-    if response is None: raise RuntimeError('Connection error - '
-                                            'server not responsing')
-    _error_codes(response)
-    return json.loads(response.text)
+    raise ConnectionError('Connection error - server not responding')
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
