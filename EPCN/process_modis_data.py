@@ -14,9 +14,9 @@ import datetime as dt
 import numpy as np
 import os
 import pandas as pd
+from requests.exceptions import ConnectionError
 import sys
 import xarray as xr
-import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -42,22 +42,44 @@ output_path = configs['nc_data_write_paths']['modis']
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def _product_band_to_retrieve():
+def _get_alias_dict():
 
-    return {#'MOD09A1': ['sur_refl_b07'],
-            #'MOD11A2': ['LST_Day_1km', 'LST_Night_1km'],
-            'MOD13Q1': ['250m_16_days_EVI', '250m_16_days_NDVI'],
-            'MCD15A3H': ['Lai_500m', 'Fpar_500m'],
-            'MOD16A2': ['ET_500m'],
-            'MOD17A2H': ['Gpp_500m']}
+    """Return dict of key: value pairs where key is name used by modis, value
+       is name used by OzFlux"""
+
+    return {'Wombat': 'Wombat State Forest',
+            'Alpine Peatland': 'Alpine Peat',
+            'Arcturus Emerald': 'Arcturus Emerald'}
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def _get_site_details(site, sites):
+
+    site_details = sites.loc[site].copy()
+    target = os.path.join(this_path,
+                          '{0}_{1}'.format(site.replace(' ', ''),
+                                           short_name))
+    site_details['full_nc_path'] = target + '.nc'
+    site_details['full_plot_path'] = target + '.png'
+    try:
+        first_date = dt.date(int(sites.loc[site, 'Start year']) - 1, 7, 1)
+        first_date_modis = dt.datetime.strftime(first_date, '%Y%m%d')
+    except (TypeError, ValueError): first_date_modis = None
+    site_details['first_date_modis'] = first_date_modis
+    try:
+        last_date = dt.date(int(sites.loc[site, 'End year']) + 1, 6, 1)
+        last_date_modis = dt.datetime.strftime(last_date, '%Y%m%d')
+    except (TypeError, ValueError): last_date_modis = None
+    site_details['last_date_modis'] = last_date_modis
+    return site_details
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
 def _band_short_name(band):
 
-    d = {'sur_refl_b07': 'reflectance_b7', 'LST_Day_1km': 'LST_Day', 
-         'LST_Night_1km': 'LST_night', '250m_16_days_EVI': 'EVI', 
-         '250m_16_days_NDVI': 'NDVI', 'Lai_500m': 'LAI', 'Fpar_500m': 'FPAR', 
+    d = {'sur_refl_b07': 'reflectance_b7', 'LST_Day_1km': 'LST_Day',
+         'LST_Night_1km': 'LST_night', '250m_16_days_EVI': 'EVI',
+         '250m_16_days_NDVI': 'NDVI', 'Lai_500m': 'LAI', 'Fpar_500m': 'FPAR',
          'ET_500m': 'ET', 'Gpp_500m': 'GPP'}
     return d[band]
 #------------------------------------------------------------------------------
@@ -77,11 +99,22 @@ def make_qc_flags(ds):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
+def _product_band_to_retrieve():
+
+    return {'MOD09A1': ['sur_refl_b07'],
+            'MOD11A2': ['LST_Day_1km', 'LST_Night_1km'],
+            'MOD13Q1': ['250m_16_days_EVI', '250m_16_days_NDVI'],
+            'MCD15A3H': ['Lai_500m', 'Fpar_500m'],
+            'MOD16A2': ['ET_500m'],
+            'MOD17A2H': ['Gpp_500m']}
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
 def _set_global_attrs(ds, site_details):
-    
-    start_date = dt.datetime.strftime(pd.to_datetime(ds.time[0].item()), 
+
+    start_date = dt.datetime.strftime(pd.to_datetime(ds.time[0].item()),
                                       '%Y-%m-%d %H:%M:%S')
-    end_date = dt.datetime.strftime(pd.to_datetime(ds.time[-1].item()), 
+    end_date = dt.datetime.strftime(pd.to_datetime(ds.time[-1].item()),
                                     '%Y-%m-%d %H:%M:%S')
     run_date = dt.datetime.strftime(dt.datetime.now(), '%Y-%m-%d %H:%M:%S')
     nc_nrecs = len(ds.time)
@@ -93,19 +126,19 @@ def _set_global_attrs(ds, site_details):
          'time_step': str(int(site_details['Time step'])),
          'time_zone': site_details['Time zone'],
          'nc_rundatetime': run_date}
-    
+
     ds.attrs.update(d)
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
 def _set_var_attrs(ds):
-    
+
     for this_var in list(ds.variables):
         if this_var in ds.dims: continue
         ds[this_var].attrs['units'] = ds.units
         ds[this_var].attrs['valid_range'] = '1e+35,-1e+35'
 #------------------------------------------------------------------------------
-    
+
 #------------------------------------------------------------------------------
 if __name__ == "__main__":
 
@@ -113,11 +146,13 @@ if __name__ == "__main__":
     sites = utils.get_ozflux_site_list(master_file_path)
 
     # Get list of ozflux sites that are in the MODIS collection (note Wombat
-    # has designated site name 'Wombat', so change in dict)
+    # has designated site name 'Wombat', Alpine Peat has designated site name
+    # Alpine Peatland, so change both in dict)
     ozflux_modis_collection_sites = mfr.get_network_list('OZFLUX')
     coll_dict = {ozflux_modis_collection_sites[x]['network_sitename']:
                  x for x in ozflux_modis_collection_sites.keys()}
-    coll_dict['Wombat State Forest'] = coll_dict.pop('Wombat')
+    alias_dict = _get_alias_dict()
+    for key in alias_dict: coll_dict[alias_dict[key]] = coll_dict.pop(key)
 
     # Iterate on product (create dirs where required)
     products_dict = _product_band_to_retrieve()
@@ -129,45 +164,44 @@ if __name__ == "__main__":
         for band in products_dict[product]:
             short_name = _band_short_name(band)
 
-            # Get site data and write to netcdf
-            for site in sites.index[22:]:
-                site_details = sites.loc[site]
+        # Get site data and write to netcdf
+            for site in sites.index:
                 print('Retrieving data for site {}:'.format(site))
-                target = os.path.join(this_path,
-                                      '{0}_{1}'.format(site.replace(' ', ''),
-                                                       short_name))
-                full_nc_path = target + '.nc'
-                full_plot_path = target + '.png'
-                try:
-                    first_date = dt.date(int(sites.loc[site, 'Start year']) - 1, 7, 1)
-                    first_date_modis = dt.datetime.strftime(first_date, '%Y%m%d')
-                except (TypeError, ValueError): first_date_modis = None
-                try:
-                    last_date = dt.date(int(sites.loc[site, 'End year']) + 1, 6, 1)
-                    last_date_modis = dt.datetime.strftime(last_date, '%Y%m%d')
-                except (TypeError, ValueError): last_date_modis = None
+                site_details = _get_site_details(site, sites)
 
-                # Get sites in the collection
-                if site in coll_dict.keys():
-                    site_code = coll_dict[site]
-                    x = mfr.modis_data_network(product, band, 'OZFLUX', site_code,
-                                               first_date_modis, last_date_modis,
-                                               qcfiltered=True)
+                # Try to parse the data; catch server errors and continue
+                try:
+                    # Get sites in the collection
+                    try:
+                        site_code = coll_dict[site]
+                        x = mfr.modis_data_network(
+                            product, band, 'OZFLUX', site_code,
+                            site_details['first_date_modis'],
+                            site_details['last_date_modis'], qcfiltered=True
+                            )
 
                 # Get sites not in the collection
-                else:
-                    km_dims = mfr.get_dims_reqd_for_npixels(product, 5)
-                    x = mfr.modis_data(product, band, site_details.Latitude, 
-                                       site_details.Longitude, first_date_modis, 
-                                       last_date_modis, km_dims, km_dims, site, 
-                                       qcfiltered=True)
+                    except KeyError:
+                        km_dims = mfr.get_dims_reqd_for_npixels(product, 5)
+                        x = mfr.modis_data(
+                            product, band, site_details.Latitude,
+                            site_details.Longitude,
+                            site_details['first_date_modis'],
+                            site_details['last_date_modis'],
+                            km_dims, km_dims, site, qcfiltered=True
+                            )
+                except ConnectionError as e:
+                    print ('Data retrieval failed for site {0} with error'
+                           '{1}'.format(site, e))
+                    continue
 
                 # Reduce the number of pixels to 3 x 3
                 x.data_array = mfr.get_pixel_subset(x.data_array,
                                                     pixels_per_side = 3)
 
                 # Get outputs and write to file (plots then nc)
-                x.plot_data(plot_to_screen=False, save_to_path=full_plot_path)
+                x.plot_data(plot_to_screen=False,
+                            save_to_path=site_details['full_plot_path'])
                 ds = xr.merge([x.get_spatial_mean().rename({band: short_name}),
                                x.get_spatial_mean(smooth_signal=True)
                                .rename({band: short_name + '_smoothed'})])
@@ -180,4 +214,4 @@ if __name__ == "__main__":
                 final_ds = xr.merge([resampled_ds, make_qc_flags(resampled_ds)])
                 final_ds.attrs = resampled_ds.attrs
                 _set_global_attrs(final_ds, site_details)
-                final_ds.to_netcdf(full_nc_path, format='NETCDF4')
+                final_ds.to_netcdf(site_details['full_nc_path'], format='NETCDF4')
