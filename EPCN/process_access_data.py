@@ -138,7 +138,7 @@ class access_data_converter():
 
         print('Writing netCDF file for site {}'.format(self.site_details.name))
         dataset = self.create_dataset()
-        fname = '{}_ACCESS.nc'.format(''.join(self.site_details.name.split(' ')))
+        fname = '{}_ACCESS.nc'.format(self.site_details.name.replace(' ', ''))
         target = os.path.join(write_path, 'PFP_format', fname)
         dataset.to_netcdf(target, format='NETCDF4')
     #--------------------------------------------------------------------------
