@@ -27,8 +27,6 @@ import pandas as pd
 import xarray as xr
 import sys
 
-import pdb
-
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
 #------------------------------------------------------------------------------
@@ -317,6 +315,7 @@ if __name__ == "__main__":
     # Get conversion class and write text data to nc file
     sites = utils.get_ozflux_site_list()
     for site in sites.index:
+        specific_file_path = nc_file_path.format(site.replace(' ', ''))
         conv_class = bom_data_converter(sites.loc[site])
-        conv_class.write_to_netcdf(nc_file_path)
+        conv_class.write_to_netcdf(specific_file_path)
 #------------------------------------------------------------------------------
