@@ -53,14 +53,15 @@ def _get_alias_dict():
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def _get_site_details(site, sites):
+def _get_site_details(site_details, product, band_short_name):
 
-    site_details = sites.loc[site].copy()
-    target = os.path.join(this_path,
-                          '{0}_{1}'.format(site.replace(' ', ''),
-                                           short_name))
-    site_details['full_nc_path'] = target + '.nc'
-    site_details['full_plot_path'] = target + '.png'
+    use_name = site_details.name.replace(' ', '')
+    dir_path = os.path.join(output_path.format(use_name), product)
+    if not os.path.exists(dir_path): os.makedirs(dir_path)
+    files_path = os.path.join(dir_path, 
+                              '{0}_{1}'.format(use_name, band_short_name))
+    site_details['full_nc_path'] = files_path + '.nc'
+    site_details['full_plot_path'] = files_path + '.png'
     try:
         first_date = dt.date(int(sites.loc[site, 'Start year']) - 1, 7, 1)
         first_date_modis = dt.datetime.strftime(first_date, '%Y%m%d')
@@ -157,8 +158,6 @@ if __name__ == "__main__":
     # Iterate on product (create dirs where required)
     products_dict = _product_band_to_retrieve()
     for product in products_dict:
-        this_path = os.path.join(output_path, product)
-        if not os.path.exists(this_path): os.makedirs(this_path)
 
         # Iterate on band
         for band in products_dict[product]:
@@ -167,7 +166,8 @@ if __name__ == "__main__":
         # Get site data and write to netcdf
             for site in sites.index:
                 print('Retrieving data for site {}:'.format(site))
-                site_details = _get_site_details(site, sites)
+                site_details = _get_site_details(sites.loc[site].copy(), 
+                                                 product, band)
 
                 # Try to parse the data; catch server errors and continue
                 try:
