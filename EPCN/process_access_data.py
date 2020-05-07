@@ -17,6 +17,7 @@ import os
 import pandas as pd
 from pytz import timezone
 import xarray as xr
+import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -30,8 +31,9 @@ import met_funcs
 #------------------------------------------------------------------------------
 
 configs = utils.get_configs()
-access_file_path = configs['nc_data_write_paths']['access']
-access_file_path_prev = configs['nc_data_write_paths']['access_previous']
+raw_file_path = configs['raw_data_write_paths']['access']
+raw_file_path_prev = configs['raw_data_write_paths']['access_previous']
+nc_write_path = configs['nc_data_write_paths']['access']
 
 #------------------------------------------------------------------------------
 ### CLASSES ###
@@ -110,7 +112,7 @@ class access_data_converter():
     def get_file_list(self):
 
         search_str = self.site_details.name.replace(' ', '')
-        return sorted(glob.glob(access_file_path +
+        return sorted(glob.glob(raw_file_path +
                                 '/Monthly_files/**/{}*'.format(search_str)))
     #--------------------------------------------------------------------------
 
@@ -139,7 +141,7 @@ class access_data_converter():
         print('Writing netCDF file for site {}'.format(self.site_details.name))
         dataset = self.create_dataset()
         fname = '{}_ACCESS.nc'.format(self.site_details.name.replace(' ', ''))
-        target = os.path.join(write_path, 'PFP_format', fname)
+        target = os.path.join(write_path, fname)
         dataset.to_netcdf(target, format='NETCDF4')
     #--------------------------------------------------------------------------
 
@@ -172,7 +174,7 @@ def _collate_prior_data(site_str):
         return sub_ds.drop_sel(time=sub_ds.time[-1].data)
 
     cutoff_month = '201910'
-    f_list = sorted(glob.glob(access_file_path_prev + '/**/{}*'.format(site_str)))
+    f_list = sorted(glob.glob(raw_file_path_prev + '/**/{}*'.format(site_str)))
     if len(f_list) == 0: raise OSError
     months = [os.path.splitext(x)[0].split('_')[-1] for x in f_list]
     for i, month in enumerate(months): 
@@ -190,6 +192,7 @@ def _combine_datasets(current_ds, site_name):
     
     site_name = site_name.replace(' ','')
     prior_ds = _collate_prior_data(site_name)
+    pdb.set_trace()
     prior_ds = prior_ds.drop(labels=[x for x in prior_ds.variables 
                                      if not x in current_ds.variables])
     for var in current_ds.variables:
@@ -402,9 +405,9 @@ vars_dict = {'av_swsfcdown': 'Fsd',
 #------------------------------------------------------------------------------
 if __name__ == "__main__":
 
-    sites_df = utils.get_ozflux_site_list()
-    for site in sites_df.index:
-        site_details = sites_df.loc[site]
-        converter = access_data_converter(site_details, include_prior_data=True)
-        converter.write_to_netcdf(access_file_path)
+    sites = utils.get_ozflux_site_list()
+    for site in sites.index:
+        specific_file_path = nc_write_path.format(site.replace(' ', ''))
+        converter = access_data_converter(sites.loc[site], include_prior_data=True)
+        converter.write_to_netcdf(specific_file_path)
 #------------------------------------------------------------------------------
