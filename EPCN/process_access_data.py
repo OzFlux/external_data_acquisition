@@ -192,7 +192,6 @@ def _combine_datasets(current_ds, site_name):
     
     site_name = site_name.replace(' ','')
     prior_ds = _collate_prior_data(site_name)
-    pdb.set_trace()
     prior_ds = prior_ds.drop(labels=[x for x in prior_ds.variables 
                                      if not x in current_ds.variables])
     for var in current_ds.variables:
