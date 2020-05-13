@@ -34,7 +34,7 @@ import utils
 #------------------------------------------------------------------------------
 
 configs = utils.get_configs()
-base_dir = configs['nc_data_write_paths']['access']
+base_dir = configs['raw_data_write_paths']['access']
 master_file_path = configs['DEFAULT']['site_details']
 base_log_path = configs['DEFAULT']['log_path']
 
