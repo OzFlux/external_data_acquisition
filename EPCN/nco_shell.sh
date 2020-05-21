@@ -29,7 +29,8 @@ LONG_HI=$(echo "$LONGITUDE + $DELTA"|bc)
 cd $BASE_DIR
 
 # Send output to log file
-exec 1>> Log_files/nco_shell.log 2>&1
+LOG_DIR=$(dirname $(dirname $(dirname "$(realpath $0)")))/Ancillary/Logs/ACCESS/nco_shell.log
+exec 1>> $LOG_DIR 2>&1
 
 date
 echo Beginning netCDF processing with NCO

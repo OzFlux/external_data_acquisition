@@ -144,7 +144,7 @@ def _set_var_attrs(ds):
 if __name__ == "__main__":
 
     # Get sites info for processing
-    sites = utils.get_ozflux_site_list(master_file_path)
+    sites = utils.get_ozflux_site_list(active_sites_only=False)
 
     # Get list of ozflux sites that are in the MODIS collection (note Wombat
     # has designated site name 'Wombat', Alpine Peat has designated site name

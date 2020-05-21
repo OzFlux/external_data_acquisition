@@ -42,6 +42,17 @@ nc_write_path = configs['nc_data_write_paths']['access']
 #------------------------------------------------------------------------------
 class access_data_converter():
 
+    """Conversion class for converting raw ACCESS data into PFP format
+       (note that previously, ACCESS data was collected and partially 
+       converted before dumping the raw data... tsk tsk)
+       Args:
+           * site_details (pandas dataframe): df containing the details of the
+             site as documented in the site master file
+           * include_prior_data (boolean): if True, concatenates the older 
+             semi-formatted (see above) data as well as the new data (which
+             preserves the format and attributes of th original ACCESS nc file
+    """
+    
     def __init__(self, site_details, include_prior_data=False):
 
         self.site_details = site_details
@@ -52,6 +63,9 @@ class access_data_converter():
     #--------------------------------------------------------------------------
     def create_dataset(self):
 
+        """Main method for concatenation and conversion of raw data to PFP
+           format"""
+        
         # Do formatting, conversions and attributes
         ds = self.get_raw_file()
         ds = ds.compute() # This converts from dask to numpy :)
@@ -111,6 +125,8 @@ class access_data_converter():
     #--------------------------------------------------------------------------
     def get_file_list(self):
 
+        """Return list of files found in the path for the requested site"""
+        
         search_str = self.site_details.name.replace(' ', '')
         return sorted(glob.glob(raw_file_path +
                                 '/Monthly_files/**/{}*'.format(search_str)))
@@ -119,17 +135,22 @@ class access_data_converter():
     #--------------------------------------------------------------------------
     def get_raw_file(self):
 
+        """Concatenate all files found in the path, dropping any dupe indices
+        """
+        
         def preproc(ds):
             idx = np.unique(ds.time.data, return_index=True)[1]
             return ds.isel(time=idx)
 
         return xr.open_mfdataset(self.get_file_list(), combine='by_coords',
-                                  preprocess=preproc)
+                                 preprocess=preproc)
     #--------------------------------------------------------------------------
 
     #--------------------------------------------------------------------------
     def get_utc_offset(self):
 
+        """Get the UTC offset of the site"""
+        
         tz_obj = timezone(self.site_details['Time zone'])
         now_time = dt.datetime.now()
         return (tz_obj.utcoffset(now_time) - tz_obj.dst(now_time)).seconds / 3600
@@ -154,6 +175,8 @@ class access_data_converter():
 #------------------------------------------------------------------------------
 def _apply_range_limits(ds):
 
+    """Apply variable range limits as documented in range_dict"""
+    
     for var in ds.variables:
         if var in ds.dims: continue
         lims = range_dict[var]
@@ -190,6 +213,8 @@ def _collate_prior_data(site_str):
 #------------------------------------------------------------------------------
 def _combine_datasets(current_ds, site_name):
     
+    """Collate the newer data with the older data"""
+    
     site_name = site_name.replace(' ','')
     prior_ds = _collate_prior_data(site_name)
     prior_ds = prior_ds.drop(labels=[x for x in prior_ds.variables 
@@ -206,6 +231,8 @@ def _combine_datasets(current_ds, site_name):
 #------------------------------------------------------------------------------
 def do_conversions(ds):
 
+    """Convert to desired units for output to PFP format files"""
+    
     ds['Ws'] = met_funcs.get_ws_from_uv(ds.u, ds.v)
     ds['Wd'] = met_funcs.get_wd_from_uv(ds.u, ds.v)
     ds['ps'] = met_funcs.convert_Pa_to_kPa(ds.ps)
@@ -220,6 +247,8 @@ def do_conversions(ds):
 #------------------------------------------------------------------------------
 def get_energy_components(ds):
 
+    """Calculate energy balance components"""
+    
     ds['Fsu'] = ds.Fsd - ds.Fn_sw
     ds['Flu'] = ds.Fld - ds.Fn_lw
     ds['Fn'] = (ds.Fsd - ds.Fsu) + (ds.Fld - ds.Flu)
@@ -244,6 +273,8 @@ def make_qc_flags(ds):
 #------------------------------------------------------------------------------
 def _reindex_time(ds):
 
+    """Reindex dataset to include missing cases"""
+    
     new_index = pd.date_range(ds.time[0].item(), ds.time[-1].item(), freq='60T')
     return ds.reindex(time=new_index)
 #------------------------------------------------------------------------------
@@ -404,7 +435,7 @@ vars_dict = {'av_swsfcdown': 'Fsd',
 #------------------------------------------------------------------------------
 if __name__ == "__main__":
 
-    sites = utils.get_ozflux_site_list()
+    sites = utils.get_ozflux_site_list(active_sites_only=True)
     for site in sites.index:
         specific_file_path = nc_write_path.format(site.replace(' ', ''))
         converter = access_data_converter(sites.loc[site], include_prior_data=True)

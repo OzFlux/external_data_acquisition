@@ -35,7 +35,6 @@ import utils
 
 configs = utils.get_configs()
 base_dir = configs['raw_data_write_paths']['access']
-master_file_path = configs['DEFAULT']['site_details']
 base_log_path = configs['DEFAULT']['log_path']
 
 #------------------------------------------------------------------------------
@@ -49,13 +48,12 @@ retrieval_path = 'http://opendap.bom.gov.au:8080/thredds/{}/bmrc/access-r-fc/ops
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def check_seen_files(opendap_url, base_dir, site_list):
+def check_seen_files(site_list):
 
     """Check local files to see which of the available files on the opendap
        server have been seen and processed"""
 
-#    site_list = [x.replace(' ','') for x in site_list]
-    opendap_files = _list_opendap_dirs(opendap_url)
+    opendap_files = _list_opendap_dirs()
     month_dirs = np.unique([x[:6] for x in opendap_files]).astype(str)
     check_paths = [os.path.join(base_dir, 'Monthly_files', x) for x in month_dirs]
     data = (np.tile(False, len(opendap_files) * len(site_list))
@@ -109,14 +107,15 @@ def check_set_subdirs(base_dir):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def _list_opendap_dirs(url):
+def _list_opendap_dirs():
 
     """Scrape list of directories from opendap surface url"""
 
-    full_url = url.format('dodsC')
+    full_url = retrieval_path.format('dodsC')
     page = requests.get(full_url).text
     soup = BeautifulSoup(page, 'html.parser')
-    dir_list = [url + '/' + node.get('href') for node in soup.find_all('a')
+    dir_list = [retrieval_path + '/' + node.get('href') 
+                for node in soup.find_all('a')
                 if node.get('href').endswith('html')]
     new_list = []
     for path in dir_list:
@@ -168,7 +167,7 @@ def wget_exec(read_path, write_path, server_dir):
     logging.info('Retrieving forecast files for date {}'.format(server_dir))
     file_list = map(lambda x: '{}_{}'.format(server_dir, str(x).zfill(3)),
                     range(7))
-    wget_log_path = os.path.join(base_dir, 'Log_files', 'Download.log')
+    wget_log_path = os.path.join(base_log_path, 'ACCESS', 'Download.log')
     wget_prefix = '/usr/bin/wget -nv -a {} -O'.format(wget_log_path)
     for f in file_list:
         logging.info('Forecast +{} hrs'.format(str(int(f.split('_')[-1]))))
@@ -195,7 +194,7 @@ full_log_path = os.path.join(base_log_path, 'ACCESS',
 utils.set_logger(full_log_path)
 
 # Get site details
-site_df = utils.get_ozflux_site_list(master_file_path)
+site_df = utils.get_ozflux_site_list(active_sites_only=True)
 
 # Set and pre-purge requisite file paths
 check_set_subdirs(base_dir)
@@ -204,7 +203,7 @@ purge_dir(continental_file_path)
 
 # Cross check available files on the opendap server against content of existing
 # files
-files_dict = check_seen_files(retrieval_path, base_dir, site_df.index)
+files_dict = check_seen_files(site_df.index)
 
 # For each six-hour directory...
 for this_dir in sorted(files_dict.keys()):

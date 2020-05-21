@@ -7,6 +7,7 @@ Created on Wed Sep 11 11:41:50 2019
 """
 import configparser
 import logging
+import numpy as np
 import os
 import pandas as pd
 from timezonefinder import TimezoneFinder as tzf
@@ -25,7 +26,7 @@ def get_configs():
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-def get_ozflux_site_list(master_file_path = None):
+def get_ozflux_site_list(master_file_path=None, active_sites_only=False):
 
     """Generates a dataframe containing requisite site details (auto-reads 
        file location from [DEFAULT][site_details] in paths.ini - see 
@@ -49,6 +50,7 @@ def get_ozflux_site_list(master_file_path = None):
     df.drop(header_list[0], axis = 1, inplace = True)
     df['Time zone'] = [tzf().timezone_at(lng=x[0], lat=x[1]) 
                        for x in zip(df.Longitude, df.Latitude)]
+    if active_sites_only: return df.loc[np.isnan(df['End year'])]
     return df
 #------------------------------------------------------------------------------
     
