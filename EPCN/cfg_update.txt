@@ -178,7 +178,7 @@
         long_name = IRGA automatic gain control value
         group_name = diagnostics
         units = 
-    [[Ah]]
+    [[AH]]
         long_name = Absolute humidity
         group_name = meteorology
         units = g/m^3
@@ -269,7 +269,7 @@
         units = fraction,percent
     [[SH]]
         long_name = Specific humidity
-        group_name = meteorlogy
+        group_name = meteorology
         units = kg/kg
     [[SHD]]
         long_name = Specific humidity deficit
