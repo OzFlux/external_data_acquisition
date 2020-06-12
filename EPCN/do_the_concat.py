@@ -6,6 +6,7 @@ Created on Mon Jun  1 12:41:04 2020
 @author: imchugh
 """
 
+from configobj import ConfigObj
 import datetime as dt
 import glob
 import numpy as np
@@ -87,9 +88,32 @@ def set_var_attrs(ds):
             else:
                 attrs = {}
             attrs.update(vars_dict[generic_var])
+            try:
+                standard_attrs = configs['variable_attributes'][generic_var]
+                if isinstance(standard_attrs['units'], list):
+                    idx = unit_list_level_dict[generic_var]
+                    standard_attrs['units'] = standard_attrs['units'][idx]
+                attrs.update(standard_attrs)
+            except KeyError:
+                pass
             ds[var].attrs = attrs
         except RuntimeError:
             continue
+
+#    if not this_var in no_generic_list:
+#        this_dict = generic_dict.copy()
+#    else:
+#        this_dict = {}
+#    try:
+#        var_attrs_dict = configs['variable_attributes'][this_var]
+#        if isinstance(var_attrs_dict['units'], list):
+#            idx = unit_list_level_dict[var]
+#            var_attrs_dict['units'] = var_attrs_dict['units'][idx]
+#        this_dict.update(var_attrs_dict)
+#    except KeyError: pass
+#    try: this_dict.update(vars_dict[this_var])
+#    except TypeError: pass
+#    return this_dict
 
 def set_var_encoding(ds):
     
@@ -192,6 +216,8 @@ vars_dict = {'AH': {'source': 'Calculated'},
 
 alias_dict = {'q': 'SH', 'Ah': 'AH'}
 
+unit_list_level_dict = {'RH': 1, 'Ta': 0, 'Ps': 0, 'Ts': 0}
+
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -206,9 +232,11 @@ no_generic_list = ['time', 'crs']
 # MAIN PROGRAM
 #------------------------------------------------------------------------------
 
+cfg_path = '/mnt/OzFlux/external_data_acquisition/Code/EPCN/cfg_update.txt'
+configs = ConfigObj(cfg_path)
 sites = utils.get_ozflux_site_list()
 
-for site in sites[2:]:
+for site in sites.index[11:12]:
 
     paths = sorted(glob.glob('/rdsi/market/access_old_site_files/monthly/*/{}*'
                              .format(site.replace(' ', ''))))
