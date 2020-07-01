@@ -100,21 +100,6 @@ def set_var_attrs(ds):
         except RuntimeError:
             continue
 
-#    if not this_var in no_generic_list:
-#        this_dict = generic_dict.copy()
-#    else:
-#        this_dict = {}
-#    try:
-#        var_attrs_dict = configs['variable_attributes'][this_var]
-#        if isinstance(var_attrs_dict['units'], list):
-#            idx = unit_list_level_dict[var]
-#            var_attrs_dict['units'] = var_attrs_dict['units'][idx]
-#        this_dict.update(var_attrs_dict)
-#    except KeyError: pass
-#    try: this_dict.update(vars_dict[this_var])
-#    except TypeError: pass
-#    return this_dict
-
 def set_var_encoding(ds):
     
     for var in list(ds.variables):
@@ -216,7 +201,7 @@ vars_dict = {'AH': {'source': 'Calculated'},
 
 alias_dict = {'q': 'SH', 'Ah': 'AH'}
 
-unit_list_level_dict = {'RH': 1, 'Ta': 0, 'Ps': 0, 'Ts': 0}
+unit_list_level_dict = {'RH': 1, 'Ta': 0, 'ps': 0, 'Ts': 0}
 
 #------------------------------------------------------------------------------
 
@@ -236,7 +221,7 @@ cfg_path = '/mnt/OzFlux/external_data_acquisition/Code/EPCN/cfg_update.txt'
 configs = ConfigObj(cfg_path)
 sites = utils.get_ozflux_site_list()
 
-for site in sites.index[11:12]:
+for site in sites.index[32:33]:
 
     paths = sorted(glob.glob('/rdsi/market/access_old_site_files/monthly/*/{}*'
                              .format(site.replace(' ', ''))))

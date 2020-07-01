@@ -5,6 +5,7 @@ Created on Wed Sep 11 11:41:50 2019
 
 @author: ian
 """
+from configobj import ConfigObj
 import configparser
 import logging
 import numpy as np
@@ -25,6 +26,18 @@ def get_configs():
     return config
 #------------------------------------------------------------------------------
 
+#------------------------------------------------------------------------------
+def get_conventions(file_path=None):
+
+    """Create a configuration file that defines requisite read and write paths
+       (reads from same dir as executing script - i.e. this one!)"""
+    
+    if not file_path:
+        configs = get_configs()
+        file_path = configs['DEFAULT']['variable_conventions']
+    return ConfigObj(file_path)
+#------------------------------------------------------------------------------
+    
 #------------------------------------------------------------------------------
 def get_ozflux_site_list(master_file_path=None, active_sites_only=False):
 

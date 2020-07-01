@@ -31,8 +31,10 @@ import met_funcs
 #------------------------------------------------------------------------------
 
 configs = utils.get_configs()
+conventions = utils.get_conventions()
 raw_file_path = configs['raw_data_write_paths']['access']
-raw_file_path_prev = configs['raw_data_write_paths']['access_previous']
+#raw_file_path_prev = configs['raw_data_write_paths']['access_previous']
+raw_file_path_prev = '/rdsi/market/access_old_site_files/monthly'
 nc_write_path = configs['nc_data_write_paths']['access']
 
 #------------------------------------------------------------------------------
@@ -236,9 +238,9 @@ def do_conversions(ds):
     ds['Ws'] = met_funcs.get_ws_from_uv(ds.u, ds.v)
     ds['Wd'] = met_funcs.get_wd_from_uv(ds.u, ds.v)
     ds['ps'] = met_funcs.convert_Pa_to_kPa(ds.ps)
-    ds['RH'] = (met_funcs.get_e_from_q(ds.q, ds.ps) / 
+    ds['RH'] = (met_funcs.get_e_from_q(ds.SH, ds.ps) / 
                 met_funcs.get_es(ds.Ta)) * 100
-    ds['Ah'] = met_funcs.get_Ah(ds.Ta, ds.q, ds.ps)
+    ds['AH'] = met_funcs.get_Ah(ds.Ta, ds.SH, ds.ps)
     ds['Ta'] = met_funcs.convert_Kelvin_to_celsius(ds.Ta)
     ds['Ts'] = met_funcs.convert_Kelvin_to_celsius(ds.Ts) 
     ds['Sws'] = ds['Sws'] / 100
@@ -301,26 +303,59 @@ def _resample_dataset(ds):
 #------------------------------------------------------------------------------
 def _set_var_attrs(ds):
 
-    generic_dict = {'instrument': '', 'valid_range': (-1e+35,1e+35),
-                    'missing_value': -9999, 'height': '',
-                    'standard_name': '', 'group_name': '',
-                    'serial_number': ''}
-
     for this_var in list(ds.variables):
         if this_var in ds.dims: continue
-        base_dict = generic_dict.copy()
-        try:
-            base_dict.update(attrs_dict[this_var])
-        except KeyError:
-            base_dict.update(attrs_dict[this_var.split('_')[0]])
-        ds[this_var].attrs = base_dict
+        ds[this_var].attrs = _get_var_attrs(this_var)
         ds[this_var].encoding = {'_FillValue': -9999}
+
+def _get_var_attrs(var):
+    
+    unit_list_level_dict = {'RH': 1, 'Ta': 0, 'ps': 0, 'Ts': 0}
+    if var in ['crs', 'time']:
+        base_dict = {}
+    else:
+        base_dict = generic_dict.copy()
+#    try:
+    base_dict.update(attrs_dict[var])
+#    except KeyError:
+#        pdb.set_trace()
+#        base_dict.update(attrs_dict[var.split('_')[0]])
+    try:
+        standard_attrs = conventions['variable_attributes'][var]
+        if isinstance(standard_attrs['units'], list):
+            idx = unit_list_level_dict[var]
+            standard_attrs['units'] = standard_attrs['units'][idx]
+        base_dict.update(standard_attrs)
+    except KeyError:
+        pass
+    return base_dict
+
+
+#def _set_var_attrs(ds):
+#
+#    generic_dict = {'instrument': '', 'valid_range': (-1e+35,1e+35),
+#                    'missing_value': -9999, 'height': '',
+#                    'standard_name': '', 'group_name': '',
+#                    'serial_number': ''}
+#
+#    for this_var in list(ds.variables):
+#        if this_var in ds.dims: continue
+#        base_dict = generic_dict.copy()
+#        try:
+#            base_dict.update(attrs_dict[this_var])
+#        except KeyError:
+#            base_dict.update(attrs_dict[this_var.split('_')[0]])
+#        ds[this_var].attrs = base_dict
+#        ds[this_var].encoding = {'_FillValue': -9999}
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
 def _set_global_attrs(ds, site_details):
 
     ds.attrs = {'nc_nrecs': len(ds.time),
+                'nc_level': 'L1',
+                'nc_rundatetime': (dt.datetime.now().
+                                   strftime('%Y-%m-%d %H:%M:%S')),
                 'start_date': (dt.datetime.strftime
                                (pd.Timestamp(ds.time[0].item()),
                                 '%Y-%m-%d %H:%M:%S')),
@@ -330,7 +365,8 @@ def _set_global_attrs(ds, site_details):
                 'latitude': site_details.Latitude,
                 'longitude': site_details.Longitude,
                 'site_name': site_details.name,
-                'time_step': site_details['Time step'],
+                'time_step': str(int(site_details['Time step'])),
+                'time_zone': site_details['Time zone'],
                 'xl_datemode': '0'}
     ds.time.encoding = {'units': 'days since 1800-01-01',
                         '_FillValue': None}
@@ -341,55 +377,137 @@ def _set_global_attrs(ds, site_details):
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
-attrs_dict = {'Ah': {'long_name': 'Absolute humidity',
-                     'units': 'g/m3'},
-              'Fa': {'long_name': 'Calculated available energy',
-                     'units': 'W/m2'},
-              'Fe': {'long_name': 'Surface latent heat flux',
-                     'units': 'W/m2'},
-              'Fg': {'long_name': 'Calculated ground heat flux',
-                     'units': 'W/m2',
-                     'standard_name': 'downward_heat_flux_in_soil'},
-              'Fh': {'long_name': 'Surface sensible heat flux',
-                     'units': 'W/m2'},
-              'Fld': {'long_name':
-                      'Average downward longwave radiation at the surface',
-                      'units': 'W/m2'},
-              'Flu': {'long_name':
-                      'Average upward longwave radiation at the surface',
-                      'standard_name': 'surface_upwelling_longwave_flux_in_air',
-                      'units': 'W/m2'},
-              'Fn': {'long_name': 'Calculated net radiation',
-                     'standard_name': 'surface_net_allwave_radiation',
-                     'units': 'W/m2'},
-              'Fsd': {'long_name': 'average downwards shortwave radiation at the surface',
-                      'units': 'W/m2'},
-              'Fsu': {'long_name': 'average upwards shortwave radiation at the surface',
-                      'standard_name': 'surface_upwelling_shortwave_flux_in_air',
-                      'units': 'W/m2'},
-              'Habl': {'long_name': 'planetary boundary layer height',
-                       'units': 'm'},
-              'Precip': {'long_name': 'Precipitation total over time step',
-                         'units': 'mm/30minutes'},
-              'ps': {'long_name': 'Air pressure',
-                     'units': 'kPa'},
-              'q': {'long_name': 'Specific humidity',
-                    'units': 'kg/kg'},
-              'RH': {'long_name': 'Relative humidity',
-                     'units': '%'},
-              'Sws': {'long_name': 'soil_moisture_content', 'units': 'frac'},
-              'Ta': {'long_name': 'Air temperature',
-                     'units': 'C'},
-              'Ts': {'long_name': 'soil temperature',
-                     'units': 'C'},
-              'u': {'long_name': '10m wind u component',
-                    'units': 'm s-1'},
-              'v': {'long_name': '10m wind v component',
-                    'units': 'm s-1'},
-              'Wd': {'long_name': 'Wind direction',
-                     'units': 'degT'},
-              'Ws': {'long_name': 'Wind speed',
-                     'units': 'm/s'}}
+#attrs_dict = {'AH': {'long_name': 'Absolute humidity',
+#                     'units': 'g/m3'},
+#              'Fa': {'long_name': 'Calculated available energy',
+#                     'units': 'W/m2'},
+#              'Fe': {'long_name': 'Surface latent heat flux',
+#                     'units': 'W/m2'},
+#              'Fg': {'long_name': 'Calculated ground heat flux',
+#                     'units': 'W/m2',
+#                     'standard_name': 'downward_heat_flux_in_soil'},
+#              'Fh': {'long_name': 'Surface sensible heat flux',
+#                     'units': 'W/m2'},
+#              'Fld': {'long_name':
+#                      'Average downward longwave radiation at the surface',
+#                      'units': 'W/m2'},
+#              'Flu': {'long_name':
+#                      'Average upward longwave radiation at the surface',
+#                      'standard_name': 'surface_upwelling_longwave_flux_in_air',
+#                      'units': 'W/m2'},
+#              'Fn': {'long_name': 'Calculated net radiation',
+#                     'standard_name': 'surface_net_allwave_radiation',
+#                     'units': 'W/m2'},
+#              'Fsd': {'long_name': 'average downwards shortwave radiation at the surface',
+#                      'units': 'W/m2'},
+#              'Fsu': {'long_name': 'average upwards shortwave radiation at the surface',
+#                      'standard_name': 'surface_upwelling_shortwave_flux_in_air',
+#                      'units': 'W/m2'},
+#              'Habl': {'long_name': 'planetary boundary layer height',
+#                       'units': 'm'},
+#              'Precip': {'long_name': 'Precipitation total over time step',
+#                         'units': 'mm/30minutes'},
+#              'ps': {'long_name': 'Air pressure',
+#                     'units': 'kPa'},
+#              'SH': {'long_name': 'Specific humidity',
+#                    'units': 'kg/kg'},
+#              'RH': {'long_name': 'Relative humidity',
+#                     'units': '%'},
+#              'Sws': {'long_name': 'soil_moisture_content', 'units': 'frac'},
+#              'Ta': {'long_name': 'Air temperature',
+#                     'units': 'C'},
+#              'Ts': {'long_name': 'soil temperature',
+#                     'units': 'C'},
+#              'u': {'long_name': '10m wind u component',
+#                    'units': 'm s-1'},
+#              'v': {'long_name': '10m wind v component',
+#                    'units': 'm s-1'},
+#              'Wd': {'long_name': 'Wind direction',
+#                     'units': 'degT'},
+#              'Ws': {'long_name': 'Wind speed',
+#                     'units': 'm/s'}}
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+attrs_dict = {'AH': {'source': 'Calculated'}, 
+              'Fa': {'source': 'Calculated'},
+              'Fe': {'level_type': 'single', 'accum_type': 'instantaneous', 
+                     'stash_code': '3234', 'grid_type': 'spatial', 
+                     'source': 'access'}, 
+              'Fg': {'source': 'Calculated'}, 
+              'Fh': {'level_type': 'single', 'accum_type': 'instantaneous', 
+                     'stash_code': '3217', 'grid_type': 'spatial',
+                     'source': 'ACCESS'},
+              'Fld': {'level_type': 'single', 'accum_type': 'mean',
+                      'stash_code': '2207', 'accum_units': 'hrs',
+                      'accum_value': '1', 'grid_type': 'spatial',
+                      'source': 'ACCESS'},
+              'Flu': {'source': 'Calculated'},
+              'Fn': {'source': 'Calculated'},
+              'Fn_lw': {'long_name': 'Net longwave radiation', 
+                        'group_name': 'radiation', 'units': 'W/m^2',
+                        'level_type': 'single', 'accum_type': 'mean', 
+                        'stash_code': '2201', 'accum_units': 'hrs', 
+                        'accum_value': '1', 'grid_type': 'spatial', 
+                        'source': 'ACCESS'},
+              'Fn_sw': {'long_name': 'Net shortwave radiation', 
+                        'group_name': 'radiation', 'units': 'W/m^2',
+                        'level_type': 'single', 'coverage_L1': '66',
+                        'accum_type': 'mean', 'stash_code': '1202',
+                        'accum_units': 'hrs', 'accum_value': '1',
+                        'grid_type': 'spatial', 'source': 'ACCESS'},
+              'Fsd': {'level_type': 'single', 'accum_type': 'mean', 
+                      'stash_code': '1235', 'accum_units': 'hrs', 
+                      'accum_value': '1', 'grid_type': 'spatial',
+                      'source': 'ACCESS'},
+              'Fsu': {'source': 'Calculated'},
+              'Habl': {'level_type': 'single', 
+                       'long_name': 'Planetary boundary layer height',
+                       'accum_type': 'instantaneous', 'stash_code': '25', 
+                       'units': 'm', 'grid_type': 'spatial', 
+                       'source': 'ACCESS'},
+              'Precip': {'level_type': 'single', 'accum_type': 'accumulative', 
+                         'stash_code': '5226', 'accum_units': 'hrs', 
+                         'accum_value': '3', 'grid_type': 'spatial',
+                         'source': 'ACCESS'},
+              'RH': {'source': 'Calculated'},
+              'Sws': {'accum_type': 'instantaneous', 'stash_code': '8223', 
+                      'level_type': 'multi', 'grid_type': 'spatial',
+                      'source': 'ACCESS'},
+              'Ta': {'accum_type': 'instantaneous', 'stash_code': '3236', 
+                     'level_type': 'single', 'grid_type': 'spatial',
+                     'source': 'ACCESS'},
+              'Ts': {'accum_type': 'instantaneous', 'stash_code': '8225', 
+                     'level_type': 'multi', 'grid_type': 'spatial',
+                     'source': 'ACCESS'},
+              'Wd': {'height': '10m', 'source': 'Calculated'},
+              'Ws': {'height': '10m', 'source': 'Calculated'},
+              'ps': {'accum_type': 'instantaneous', 'stash_code': '409', 
+                     'level_type': 'single', 'grid_type': 'spatial',
+                     'source': 'ACCESS'},
+              'crs': {'grid_mapping_name': 'latitude_longitude',
+                      'long_name': 'WGS 1984 datum',
+                      'longitude_of_prime_meridian': '0.0',
+                      'semi_major_axis': '6378137.0',
+                      'inverse_flattening': '298.257223563',
+                      'source': ''},
+              'SH': {'level_type': 'single', 'accum_type': 'instantaneous', 
+                     'stash_code': '3237', 'grid_type': 'spatial',
+                     'source': 'ACCESS'},
+              'time': {'long_name': 'time', 'standard_name': 'time',
+                       'source': ''},
+              'u': {'level_type': 'single', 'long_name': 'Wind u component',
+                    'accum_type': 'instantaneous', 'stash_code': '3209', 
+                    'units': 'm/s', 'height': '10m', 'grid_type': 'spatial',
+                    'source': 'ACCESS'},
+              'ustar': {'level_type': 'single', 'accum_type': 'instantaneous', 
+                        'stash_code': '3465', 'grid_type': 'spatial', 
+                        'source': 'ACCESS'},
+              'v': {'level_type': 'single', 'long_name': 'Wind v component',
+                    'accum_type': 'instantaneous', 'stash_code': '3210', 
+                    'units': 'm/s', 'height': '10m', 'grid_type': 'spatial',
+                    'source': 'ACCESS'}
+              }
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -416,7 +534,7 @@ vars_dict = {'av_swsfcdown': 'Fsd',
              'av_lwsfcdown': 'Fld',
              'av_netlwsfc': 'Fn_lw',
              'temp_scrn': 'Ta',
-             'qsair_scrn': 'q',
+             'qsair_scrn': 'SH',
              'soil_mois': 'Sws',
              'soil_temp': 'Ts',
              'u10': 'u',
@@ -429,6 +547,12 @@ vars_dict = {'av_swsfcdown': 'Fsd',
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
+generic_dict = {'height': 'not defined',
+                'standard_name': 'not defined',
+                'valid_range': '-1e+35,1e+35'}
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
 ### MAIN PROGRAM ###
 #------------------------------------------------------------------------------
 
@@ -436,7 +560,7 @@ vars_dict = {'av_swsfcdown': 'Fsd',
 if __name__ == "__main__":
 
     sites = utils.get_ozflux_site_list(active_sites_only=True)
-    for site in sites.index:
+    for site in sites.index[1:2]:
         specific_file_path = nc_write_path.format(site.replace(' ', ''))
         converter = access_data_converter(sites.loc[site], include_prior_data=True)
         converter.write_to_netcdf(specific_file_path)
