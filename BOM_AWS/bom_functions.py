@@ -344,7 +344,8 @@ def get_ftp_data(search_list = None, get_first = True, list_missing = False):
     missing_list = []
     master_bio = BytesIO()
     master_zf = zipfile.ZipFile(master_bio, 'w')
-    zip_file_list = [os.path.split(f)[1] for f in ftp.nlst(ftp_dir)]
+    zip_file_list = [os.path.split(f)[1] for f in ftp.nlst(ftp_dir)
+                     if not 'june-july' in f]
     for this_file in zip_file_list:
         if 'globalsolar' in this_file: continue
         in_file = os.path.join(ftp_dir, this_file)
