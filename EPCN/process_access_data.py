@@ -207,8 +207,11 @@ def _collate_prior_data(site_str):
     f_list = f_list[:i]
     prior_ds = xr.open_mfdataset(f_list, combine='by_coords', preprocess=preproc).compute()
     for var in list(prior_ds.variables):
+        prior_ds[var].encoding['_FillValue'] = -9999.0
+        try: prior_ds[var].encoding.pop('missing_value')
+        except KeyError: pass
         if not 'Precip' in var: continue
-        prior_ds[var] = prior_ds[var].where(cond=prior_ds[var]<9999, other=-9999)
+        prior_ds[var] = prior_ds[var].where(cond=prior_ds[var]<9999, other=-9999.0)
     return prior_ds
 #------------------------------------------------------------------------------
 
@@ -223,7 +226,7 @@ def _combine_datasets(current_ds, site_name):
                                      if not x in current_ds.variables])
     for var in current_ds.variables:
         if var in current_ds.dims: continue
-        current_ds[var].attrs = prior_ds[var].attrs
+        prior_ds[var].attrs = current_ds[var].attrs
     current_ds = xr.concat([prior_ds, current_ds], dim='time')
     idx = np.unique(current_ds.time.data, return_index=True)[1]
     current_ds = current_ds.isel(time=idx)
@@ -306,8 +309,10 @@ def _set_var_attrs(ds):
     for this_var in list(ds.variables):
         if this_var in ds.dims: continue
         ds[this_var].attrs = _get_var_attrs(this_var)
-        ds[this_var].encoding = {'_FillValue': -9999}
-
+        ds[this_var].encoding = {'_FillValue': -9999.0}
+#------------------------------------------------------------------------------
+        
+#------------------------------------------------------------------------------        
 def _get_var_attrs(var):
     
     unit_list_level_dict = {'RH': 1, 'Ta': 0, 'ps': 0, 'Ts': 0}
@@ -315,11 +320,7 @@ def _get_var_attrs(var):
         base_dict = {}
     else:
         base_dict = generic_dict.copy()
-#    try:
     base_dict.update(attrs_dict[var])
-#    except KeyError:
-#        pdb.set_trace()
-#        base_dict.update(attrs_dict[var.split('_')[0]])
     try:
         standard_attrs = conventions['variable_attributes'][var]
         if isinstance(standard_attrs['units'], list):
@@ -329,24 +330,6 @@ def _get_var_attrs(var):
     except KeyError:
         pass
     return base_dict
-
-
-#def _set_var_attrs(ds):
-#
-#    generic_dict = {'instrument': '', 'valid_range': (-1e+35,1e+35),
-#                    'missing_value': -9999, 'height': '',
-#                    'standard_name': '', 'group_name': '',
-#                    'serial_number': ''}
-#
-#    for this_var in list(ds.variables):
-#        if this_var in ds.dims: continue
-#        base_dict = generic_dict.copy()
-#        try:
-#            base_dict.update(attrs_dict[this_var])
-#        except KeyError:
-#            base_dict.update(attrs_dict[this_var.split('_')[0]])
-#        ds[this_var].attrs = base_dict
-#        ds[this_var].encoding = {'_FillValue': -9999}
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -374,58 +357,6 @@ def _set_global_attrs(ds, site_details):
     
 #------------------------------------------------------------------------------
 ### GLOBALS ###
-#------------------------------------------------------------------------------
-
-#------------------------------------------------------------------------------
-#attrs_dict = {'AH': {'long_name': 'Absolute humidity',
-#                     'units': 'g/m3'},
-#              'Fa': {'long_name': 'Calculated available energy',
-#                     'units': 'W/m2'},
-#              'Fe': {'long_name': 'Surface latent heat flux',
-#                     'units': 'W/m2'},
-#              'Fg': {'long_name': 'Calculated ground heat flux',
-#                     'units': 'W/m2',
-#                     'standard_name': 'downward_heat_flux_in_soil'},
-#              'Fh': {'long_name': 'Surface sensible heat flux',
-#                     'units': 'W/m2'},
-#              'Fld': {'long_name':
-#                      'Average downward longwave radiation at the surface',
-#                      'units': 'W/m2'},
-#              'Flu': {'long_name':
-#                      'Average upward longwave radiation at the surface',
-#                      'standard_name': 'surface_upwelling_longwave_flux_in_air',
-#                      'units': 'W/m2'},
-#              'Fn': {'long_name': 'Calculated net radiation',
-#                     'standard_name': 'surface_net_allwave_radiation',
-#                     'units': 'W/m2'},
-#              'Fsd': {'long_name': 'average downwards shortwave radiation at the surface',
-#                      'units': 'W/m2'},
-#              'Fsu': {'long_name': 'average upwards shortwave radiation at the surface',
-#                      'standard_name': 'surface_upwelling_shortwave_flux_in_air',
-#                      'units': 'W/m2'},
-#              'Habl': {'long_name': 'planetary boundary layer height',
-#                       'units': 'm'},
-#              'Precip': {'long_name': 'Precipitation total over time step',
-#                         'units': 'mm/30minutes'},
-#              'ps': {'long_name': 'Air pressure',
-#                     'units': 'kPa'},
-#              'SH': {'long_name': 'Specific humidity',
-#                    'units': 'kg/kg'},
-#              'RH': {'long_name': 'Relative humidity',
-#                     'units': '%'},
-#              'Sws': {'long_name': 'soil_moisture_content', 'units': 'frac'},
-#              'Ta': {'long_name': 'Air temperature',
-#                     'units': 'C'},
-#              'Ts': {'long_name': 'soil temperature',
-#                     'units': 'C'},
-#              'u': {'long_name': '10m wind u component',
-#                    'units': 'm s-1'},
-#              'v': {'long_name': '10m wind v component',
-#                    'units': 'm s-1'},
-#              'Wd': {'long_name': 'Wind direction',
-#                     'units': 'degT'},
-#              'Ws': {'long_name': 'Wind speed',
-#                     'units': 'm/s'}}
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -560,7 +491,7 @@ generic_dict = {'height': 'not defined',
 if __name__ == "__main__":
 
     sites = utils.get_ozflux_site_list(active_sites_only=True)
-    for site in sites.index[1:2]:
+    for site in sites.index:
         specific_file_path = nc_write_path.format(site.replace(' ', ''))
         converter = access_data_converter(sites.loc[site], include_prior_data=True)
         converter.write_to_netcdf(specific_file_path)
