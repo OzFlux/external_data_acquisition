@@ -288,9 +288,10 @@ def get_aws_station_details(with_timezone = False):
             continue
     df.index = df['station_id']
     df['station_name'] = [x.rstrip() for x in df.station_name]
+    df = df[~df.index.duplicated(keep='first')]
     if with_timezone:
         df['time_zone'] = [get_timezone(df.loc[idx, 'lat'], df.loc[idx, 'lon'])
-                          for idx in df.index]
+                           for idx in df.index]
     return df.sort_index()
 #------------------------------------------------------------------------------
 
@@ -469,7 +470,10 @@ def get_timezone(lat, lon):
 
     # Create a timezone variable using lookup from python package, fall back
     # on API
-    tz = tzf().timezone_at(lng = lon, lat = lat)
+    try:
+        tz = tzf().timezone_at(lng = lon, lat = lat)
+    except TypeError:
+        pdb.set_trace()
     if tz: return tz
     tz = make_tz_request(lat, lon)['zoneName']
     if tz: return tz
