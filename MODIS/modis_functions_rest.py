@@ -709,7 +709,7 @@ def request_subset_by_URLstring(URLstr):
         try:
             response = requests.get(URLstr, headers=header)
             if response.status_code == 200: return json.loads(response.text)
-            if response.status_code / 100 == 5:
+            if int(response.status_code / 100) == 5:
                 raise ConnectionError('Server error {}'
                                       .format(str(response.status_code)))
             else:
