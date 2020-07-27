@@ -221,7 +221,7 @@ cfg_path = '/mnt/OzFlux/external_data_acquisition/Code/EPCN/cfg_update.txt'
 configs = ConfigObj(cfg_path)
 sites = utils.get_ozflux_site_list()
 
-for site in sites.index[32:33]:
+for site in sites.index[40:41]:
 
     paths = sorted(glob.glob('/rdsi/market/access_old_site_files/monthly/*/{}*'
                              .format(site.replace(' ', ''))))
