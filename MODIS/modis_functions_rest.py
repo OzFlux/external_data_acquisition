@@ -566,6 +566,7 @@ def _interp_missing(series):
 
     """Interpolate (Akima) signal"""
 
+    if len(series.dropna()) < 2: return series
     days = np.array((series.index - series.index[0]).days)
     data = np.array(series)
     valid_idx = np.where(~np.isnan(data))
