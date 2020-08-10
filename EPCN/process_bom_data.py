@@ -313,7 +313,7 @@ range_dict = {'Precip': [-0.01, 100],
 if __name__ == "__main__":
     
     # Get conversion class and write text data to nc file
-    sites = utils.get_ozflux_site_list()
+    sites = utils.get_ozflux_site_list(active_sites_only=True)
     for site in sites.index:
         specific_file_path = nc_file_path.format(site.replace(' ', ''))
         conv_class = bom_data_converter(sites.loc[site])
