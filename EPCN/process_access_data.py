@@ -120,6 +120,10 @@ class access_data_converter():
             try: final_ds = _combine_datasets(final_ds, self.site_details.name)
             except OSError: pass
         _set_global_attrs(final_ds, self.site_details)
+        
+        # Insert old variable names temporarily
+        final_ds = xr.merge([final_ds, _make_temp_vars(final_ds)])
+        
         return final_ds
 
     #--------------------------------------------------------------------------
@@ -273,6 +277,22 @@ def make_qc_flags(ds):
         da.name = var + '_QCFlag'
         da_list.append(da)
     return xr.merge(da_list)
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def _make_temp_vars(ds):
+
+    """Temporary addition of old variable names"""
+    
+    ds_list = []
+    rename_dict = {'AH': 'Ah', 'SH': 'q'}
+    for this_str in rename_dict.keys():
+        vars_list = [x for x in ds.variables if this_str in x]
+        vars_mapper = {var: var.replace(this_str, rename_dict[this_str]) 
+                       for var in vars_list}
+        sub_ds = ds[vars_list].rename(vars_mapper)
+        ds_list.append(sub_ds)
+    return xr.merge(ds_list)
 #------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
@@ -490,8 +510,8 @@ generic_dict = {'height': 'not defined',
 #------------------------------------------------------------------------------
 if __name__ == "__main__":
 
-    sites = utils.get_ozflux_site_list(active_sites_only=True)
-    for site in sites.index:
+    sites = utils.get_ozflux_site_list()#(active_sites_only=True)
+    for site in sites.index[1:]:
         specific_file_path = nc_write_path.format(site.replace(' ', ''))
         converter = access_data_converter(sites.loc[site], include_prior_data=True)
         converter.write_to_netcdf(specific_file_path)
