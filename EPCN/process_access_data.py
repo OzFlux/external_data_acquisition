@@ -17,7 +17,6 @@ import os
 import pandas as pd
 from pytz import timezone
 import xarray as xr
-import pdb
 
 #------------------------------------------------------------------------------
 ### MODULES (CUSTOM) ###
@@ -119,10 +118,10 @@ class access_data_converter():
         if self.include_prior_data:
             try: final_ds = _combine_datasets(final_ds, self.site_details.name)
             except OSError: pass
-        _set_global_attrs(final_ds, self.site_details)
         
         # Insert old variable names temporarily
         final_ds = xr.merge([final_ds, _make_temp_vars(final_ds)])
+        _set_global_attrs(final_ds, self.site_details)
         
         return final_ds
 

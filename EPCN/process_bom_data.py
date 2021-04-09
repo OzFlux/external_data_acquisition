@@ -81,8 +81,8 @@ class bom_data_converter(object):
         df.drop('Precip_accum', axis=1, inplace=True)
         df.ps = df.ps / 10 # Convert hPa to kPa
         T_K = met_funcs.convert_celsius_to_Kelvin(df.Ta) # Get Ta in K
-        df['q'] = met_funcs.get_q(df.RH, T_K, df.ps)
-        df['Ah'] = met_funcs.get_Ah(T_K, df.q, df.ps)
+        df['SH'] = met_funcs.get_q(df.RH, T_K, df.ps)
+        df['AH'] = met_funcs.get_Ah(T_K, df.SH, df.ps)
         _interpolate_missing(df)
         if self.site_details['Time step'] == 60: df = _resample_dataframe(df)
         _apply_range_limits(df)
@@ -118,6 +118,9 @@ class bom_data_converter(object):
         # Generate variable and global attribute dictionaries and write to xarray dataset
         _set_var_attrs(ds, nearest_stations)
         ds = xr.merge([ds, make_qc_flags(ds)])
+
+        # Insert old variable names temporarily
+        ds = xr.merge([ds, _make_temp_vars(ds)])
         _set_global_attrs(ds, self.site_details)
 
         return ds
@@ -214,6 +217,22 @@ def make_qc_flags(ds):
         da_list.append(da)
     return xr.merge(da_list)
 #------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+def _make_temp_vars(ds):
+
+    """Temporary addition of old variable names"""
+    
+    ds_list = []
+    rename_dict = {'AH': 'Ah', 'SH': 'q'}
+    for this_str in rename_dict.keys():
+        vars_list = [x for x in ds.variables if this_str in x]
+        vars_mapper = {var: var.replace(this_str, rename_dict[this_str]) 
+                       for var in vars_list}
+        sub_ds = ds[vars_list].rename(vars_mapper)
+        ds_list.append(sub_ds)
+    return xr.merge(ds_list)
+#------------------------------------------------------------------------------
     
 #------------------------------------------------------------------------------
 def _set_global_attrs(ds, site_details):
@@ -252,13 +271,13 @@ def _set_var_attrs(ds, nearest_stations):
                 'bom_dist (km)': str(nearest_stations.iloc[idx]['dist (km)']),
                 'time_zone': nearest_stations.iloc[idx]['time_zone']}
             
-    vars_dict = {'Ah': {'long_name': 'Absolute humidity',
+    vars_dict = {'AH': {'long_name': 'Absolute humidity',
                         'units': 'g/m3'},
                  'Precip': {'long_name': 'Precipitation total over time step',
                             'units': 'mm/30minutes'},
                  'ps': {'long_name': 'Air pressure',
                         'units': 'kPa'},
-                 'q': {'long_name': 'Specific humidity',
+                 'SH': {'long_name': 'Specific humidity',
                        'units': 'kg/kg'},
                  'RH': {'long_name': 'Relative humidity',
                         'units': '%'},
@@ -301,8 +320,8 @@ range_dict = {'Precip': [-0.01, 100],
               'Wg': [0, 100],
               'Wd': [0, 360], 
               'ps': [70, 110],
-              'q': [0, 1],
-              'Ah': [0, 80]}
+              'SH': [0, 1],
+              'AH': [0, 80]}
 #------------------------------------------------------------------------------
     
 #------------------------------------------------------------------------------
@@ -313,7 +332,7 @@ range_dict = {'Precip': [-0.01, 100],
 if __name__ == "__main__":
     
     # Get conversion class and write text data to nc file
-    sites = utils.get_ozflux_site_list(active_sites_only=True)
+    sites = utils.get_ozflux_site_list()#(active_sites_only=True)
     for site in sites.index:
         specific_file_path = nc_file_path.format(site.replace(' ', ''))
         conv_class = bom_data_converter(sites.loc[site])
