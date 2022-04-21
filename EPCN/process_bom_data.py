@@ -14,6 +14,9 @@ To do:
       another time zone
     - add a key to the metadata describing the bom sites, and remove from 
       individual variables
+
+Modified: cewenz - 2022/04/20 - adjust variable names and attributes as well as 
+              global attributes to cf 1.8 standard as in PyFluxPro required.
 """
 
 #------------------------------------------------------------------------------
@@ -120,7 +123,7 @@ class bom_data_converter(object):
         ds = xr.merge([ds, make_qc_flags(ds)])
 
         # Insert old variable names temporarily
-        ds = xr.merge([ds, _make_temp_vars(ds)])
+        #ds = xr.merge([ds, _make_temp_vars(ds)])
         _set_global_attrs(ds, self.site_details)
 
         return ds
@@ -240,20 +243,22 @@ def _set_global_attrs(ds, site_details):
     """Make a dictionary of global attributes"""
 
     ds.attrs = {'nc_nrecs': len(ds.time),
-                'start_date': (dt.datetime.strftime
+                'processing_level':'L1',
+                'time_coverage_start': (dt.datetime.strftime
                                (pd.Timestamp(ds.time[0].item()),
                                 '%Y-%m-%d %H:%M:%S')),
-                'end_date': (dt.datetime.strftime
+                'time_coverage_end': (dt.datetime.strftime
                              (pd.Timestamp(ds.time[-1].item()),
                               '%Y-%m-%d %H:%M:%S')),
                 'latitude': site_details.Latitude,
                 'longitude': site_details.Longitude,
-                'elevation': site_details.Altitude,
+                'altitude': site_details.Altitude,
                 'site_name': site_details.name,
-                'time_step': site_details['Time step'],
-                'nc_rundatetime': dt.datetime.strftime(dt.datetime.now(),
-                                                       '%Y-%m-%d %H:%M:%S'),
-                'xl_datemode': '0'}
+                'time_zone': site_details['Time zone'],
+                'time_step': site_details['Time step']} #,
+                #'nc_rundatetime': dt.datetime.strftime(dt.datetime.now(),
+                #                                       '%Y-%m-%d %H:%M:%S'),
+                #'xl_datemode': '0'}
 
     ds.time.encoding = {'units': 'days since 1800-01-01',
                         '_FillValue': None}
@@ -272,30 +277,48 @@ def _set_var_attrs(ds, nearest_stations):
                 'time_zone': nearest_stations.iloc[idx]['time_zone']}
             
     vars_dict = {'AH': {'long_name': 'Absolute humidity',
-                        'units': 'g/m3'},
-                 'Precip': {'long_name': 'Precipitation total over time step',
-                            'units': 'mm/30minutes'},
-                 'ps': {'long_name': 'Air pressure',
-                        'units': 'kPa'},
+                        'units': 'g/m3',
+                        'standard_name' : 'mass_concentration_of_water_vapor_in_air',
+                        'statistic_type' : 'average'},
+                 'Precip': {'long_name': 'Rainfall',
+                            'units': 'mm',
+                            'standard_name' : 'thickness_of_rainfall_amount',
+                            'statistic_type' : 'sum'},
+                 'ps': {'long_name': 'Surface air pressure',
+                        'units': 'kPa',
+                        'standard_name' : 'surface_air_pressure',
+                        'statistic_type' : 'average'},
                  'SH': {'long_name': 'Specific humidity',
-                       'units': 'kg/kg'},
+                        'units': 'kg/kg',
+                        'standard_name' : 'specific_humidity',
+                        'statistic_type' : 'average'},
                  'RH': {'long_name': 'Relative humidity',
-                        'units': '%'},
+                        'units': 'percent',
+                        'standard_name' : 'relative_humidity',
+                        'statistic_type' : 'average'},
                  'Ta': {'long_name': 'Air temperature',
-                        'units': 'C'},
+                        'units': 'degC',
+                        'standard_name' : 'air_temperature',
+                        'statistic_type' : 'average'},
                  'Td': {'long_name': 'Dew point temperature',
-                        'units': 'C'},
+                        'units': 'degC',
+                        'statistic_type' : 'average'},
                  'Wd': {'long_name': 'Wind direction',
-                        'units': 'degT'},
+                        'units': 'degrees',
+                        'standard_name' : 'wind_from_direction',
+                        'statistic_type' : 'average'},
                  'Ws': {'long_name': 'Wind speed',
-                        'units': 'm/s'},
+                        'units': 'm/s',
+                        'standard_name' : 'wind_speed',
+                        'statistic_type' : 'average'},
                  'Wg': {'long_name': 'Wind gust',
-                        'units': 'm/s'}}
+                        'units': 'm/s',
+                        'standard_name' : '',
+                        'statistic_type' : 'average'}
+                        }
 
-    generic_dict = {'instrument': '', 'valid_range': '-1e+35,1e+35',
-                    'missing_value': -9999, 'height': '',
-                    'standard_name': '', 'group_name': '',
-                    'serial_number': ''}
+    generic_dict = {'valid_range': '-1e+35,1e+35',
+                    'missing_value': -9999}
     
     for this_var in list(ds.variables):
         if this_var in ds.dims: continue
